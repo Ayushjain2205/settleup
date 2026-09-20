@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MOCK_TRIP } from "@/lib/mock-data";
 
-type SplitMode = "equal" | "exact" | "percent";
+type SplitMode = "equal" | "exact" | "percent" | "itemized";
 
 export default function AddExpensePage() {
   const router = useRouter();
@@ -18,6 +18,9 @@ export default function AddExpensePage() {
   const [selectedMembers, setSelectedMembers] = useState<string[]>(trip.members.map((m) => m.id));
   const [exactAmounts, setExactAmounts] = useState<Record<string, string>>({});
   const [percentages, setPercentages] = useState<Record<string, string>>({});
+  const [items, setItems] = useState<{ name: string; amount: string; splitAmong: string[] }[]>([
+    { name: "", amount: "", splitAmong: trip.members.map((m) => m.id) },
+  ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const currency = useBaseCurrency ? trip.baseCurrency : trip.spendCurrency;
@@ -37,10 +40,15 @@ export default function AddExpensePage() {
   const totalPercent = Object.values(percentages).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   const percentRemaining = 100 - totalPercent;
 
+  // Itemized split
+  const totalItemized = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const itemizedRemaining = convertedAmount - totalItemized;
+
   const canSubmit = amountNum > 0 && title.trim().length > 0 && selectedMembers.length > 0 && (
     splitMode === "equal" ||
     (splitMode === "exact" && Math.abs(exactRemaining) < 0.01) ||
-    (splitMode === "percent" && Math.abs(percentRemaining) < 0.01 && totalPercent === 100)
+    (splitMode === "percent" && Math.abs(percentRemaining) < 0.01 && totalPercent === 100) ||
+    (splitMode === "itemized" && Math.abs(itemizedRemaining) < 0.01 && items.every((item) => item.name.trim().length > 0))
   );
 
   const handleSubmit = async () => {
@@ -123,9 +131,9 @@ export default function AddExpensePage() {
         <div className="space-y-2">
           <label className="block text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Split</label>
           <div className="flex gap-1 p-0.5 bg-[var(--border-color)]/30 rounded-lg">
-            {(["equal", "exact", "percent"] as const).map((mode) => (
-              <button key={mode} onClick={() => setSplitMode(mode)} className={`flex-1 py-2 px-2 rounded-md text-xs font-semibold transition-colors ${splitMode === mode ? "bg-white text-[var(--foreground)]" : "text-[var(--muted)]"}`}>
-                {mode === "equal" ? "Equal" : mode === "exact" ? "Exact" : "%"}
+            {(["equal", "exact", "percent", "itemized"] as const).map((mode) => (
+              <button key={mode} onClick={() => setSplitMode(mode)} className={`flex-1 py-2 px-1.5 rounded-md text-[11px] font-semibold transition-colors ${splitMode === mode ? "bg-white text-[var(--foreground)]" : "text-[var(--muted)]"}`}>
+                {mode === "equal" ? "Equal" : mode === "exact" ? "Exact" : mode === "percent" ? "%" : "Items"}
               </button>
             ))}
           </div>
@@ -233,6 +241,89 @@ export default function AddExpensePage() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Itemized Split */}
+        {splitMode === "itemized" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--muted)]">Add items from the receipt</span>
+              <span className={`text-xs font-semibold ${Math.abs(itemizedRemaining) < 0.01 ? "text-[var(--success)]" : itemizedRemaining > 0 ? "text-[var(--accent)]" : "text-[var(--error)]"}`}>
+                {itemizedRemaining > 0.01 ? `${getSymbol()}${itemizedRemaining.toLocaleString(undefined, { maximumFractionDigits: 0 })} left` : itemizedRemaining < -0.01 ? `${getSymbol()}${Math.abs(itemizedRemaining).toLocaleString(undefined, { maximumFractionDigits: 0 })} over` : "Balanced"}
+              </span>
+            </div>
+
+            <div className="bg-white border border-[var(--border-color)] rounded-xl divide-y divide-[var(--border-color)]">
+              {items.map((item, idx) => (
+                <div key={idx} className="px-3 py-2.5 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) => {
+                        const newItems = [...items];
+                        newItems[idx].name = e.target.value;
+                        setItems(newItems);
+                      }}
+                      placeholder="Item name"
+                      className="flex-1 text-sm font-medium text-[var(--foreground)] bg-transparent border-0 focus:outline-none placeholder:text-[var(--muted)]/40"
+                    />
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-[var(--muted)]">{getSymbol()}</span>
+                      <input
+                        type="number"
+                        value={item.amount}
+                        onChange={(e) => {
+                          const newItems = [...items];
+                          newItems[idx].amount = e.target.value;
+                          setItems(newItems);
+                        }}
+                        placeholder="0"
+                        className="w-20 text-right text-sm font-semibold text-[var(--foreground)] bg-transparent border-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    {items.length > 1 && (
+                      <button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="p-1">
+                        <svg className="w-4 h-4 text-[var(--error)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  {/* Split among toggles */}
+                  <div className="flex flex-wrap gap-1">
+                    {trip.members.map((member) => (
+                      <button
+                        key={member.id}
+                        onClick={() => {
+                          const newItems = [...items];
+                          if (newItems[idx].splitAmong.includes(member.id)) {
+                            newItems[idx].splitAmong = newItems[idx].splitAmong.filter((id) => id !== member.id);
+                          } else {
+                            newItems[idx].splitAmong = [...newItems[idx].splitAmong, member.id];
+                          }
+                          setItems(newItems);
+                        }}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold transition-colors ${item.splitAmong.includes(member.id) ? "bg-[var(--primary)] text-white" : "bg-[var(--border-color)]/50 text-[var(--muted)]"}`}
+                      >
+                        {member.avatar}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setItems([...items, { name: "", amount: "", splitAmong: trip.members.map((m) => m.id) }])}
+              className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-[var(--primary)]"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add item
+            </button>
           </div>
         )}
 
