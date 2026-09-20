@@ -30,6 +30,16 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     .eq("id", id)
     .single();
 
+  // Claim any email invite waiting for this user, then proceed as a member
+  if (group && user.email) {
+    await supabase
+      .from("group_members")
+      .update({ user_id: user.id })
+      .is("user_id", null)
+      .eq("group_id", id)
+      .eq("email", user.email);
+  }
+
   if (!group) {
     return (
       <div className="min-h-screen bg-[var(--background)] flex flex-col items-center justify-center px-6">

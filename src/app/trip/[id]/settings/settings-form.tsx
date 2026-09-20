@@ -14,7 +14,7 @@ interface SettingsFormProps {
     fixedFxRate: number;
     createdBy: string | null;
   };
-  members: { id: string; name: string; avatar: string; userId: string | null }[];
+  members: { id: string; name: string; avatar: string; userId: string | null; email: string | null }[];
   currentUserId: string;
 }
 
@@ -28,6 +28,10 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
   const [isEditingRate, setIsEditingRate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
 
   const isCreator = group.createdBy === currentUserId;
 
@@ -73,6 +77,33 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
       return;
     }
     router.push("/");
+  };
+
+  const handleAddMember = async () => {
+    const name = newName.trim();
+    const email = newEmail.trim().toLowerCase();
+    if (name.length < 1) return;
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setError("Enter a valid email or leave it blank");
+      return;
+    }
+    setIsAdding(true);
+    setError(null);
+    const { error } = await supabase.from("group_members").insert({
+      group_id: group.id,
+      name,
+      avatar: name[0]?.toUpperCase() || "?",
+      email: email || null,
+    });
+    setIsAdding(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setNewName("");
+    setNewEmail("");
+    setShowAddMember(false);
+    router.refresh();
   };
 
   return (
@@ -140,7 +171,12 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
 
         {/* Members */}
         <div className="px-4 py-3 bg-white border-b border-[var(--border-color)]">
-          <div className="text-sm font-medium text-[var(--foreground)] mb-2">Members</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-medium text-[var(--foreground)]">Members</div>
+            <button onClick={() => setShowAddMember(true)} className="text-xs font-semibold text-[var(--primary)]">
+              + Add
+            </button>
+          </div>
           <div className="divide-y divide-[var(--border-color)]">
             {members.map((member) => (
               <div key={member.id} className="flex items-center gap-3 py-2.5">
@@ -149,6 +185,11 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
                   <div className="text-sm font-medium text-[var(--foreground)] truncate">
                     {member.name}{member.userId === currentUserId && <span className="ml-1 text-[10px] text-[var(--muted)]">(You)</span>}
                   </div>
+                  {member.userId === null && member.email && (
+                    <div className="text-[10px] text-[var(--muted)] truncate">
+                      {member.email} · invited
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -169,6 +210,52 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
           </div>
         )}
       </main>
+
+      {/* Add member sheet */}
+      {showAddMember && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={() => setShowAddMember(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full bg-white rounded-t-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{ paddingBottom: "calc(16px + var(--safe-bottom))" }}
+          >
+            <div className="flex items-center justify-between px-4 h-14 border-b border-[var(--border-color)]">
+              <button onClick={() => setShowAddMember(false)} className="text-sm font-semibold text-[var(--primary)]">
+                Cancel
+              </button>
+              <span className="text-base font-semibold text-[var(--foreground)]">Add member</span>
+              <button onClick={handleAddMember} disabled={isAdding || newName.trim().length < 1} className="text-sm font-semibold text-[var(--primary)] disabled:opacity-40">
+                {isAdding ? "Adding..." : "Done"}
+              </button>
+            </div>
+            <div className="px-4 py-4 space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Name</label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Priya"
+                  autoFocus
+                  className="w-full px-4 py-3 bg-[var(--background)] rounded-xl text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 transition-shadow"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Email (optional)</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="priya@example.com"
+                  className="w-full px-4 py-3 bg-[var(--background)] rounded-xl text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 transition-shadow"
+                />
+                <p className="text-[11px] text-[var(--muted)]">With an email, they join automatically when they sign in.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

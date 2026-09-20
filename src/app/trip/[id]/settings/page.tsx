@@ -36,7 +36,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
 
   const { data: memberRows } = await supabase
     .from("group_members")
-    .select("id, name, avatar, user_id")
+    .select("id, name, avatar, user_id, email")
     .eq("group_id", id);
 
   return (
@@ -50,7 +50,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
         fixedFxRate: Number(group.fixed_fx_rate),
         createdBy: group.created_by,
       }}
-      members={(memberRows || []).map((m) => ({ id: m.id, name: m.name, avatar: m.avatar, userId: m.user_id }))}
+      members={(memberRows || []).map((m) => ({ id: m.id, name: m.name, avatar: m.avatar, userId: m.user_id, email: m.email }))}
       currentUserId={user.id}
     />
   );
