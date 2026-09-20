@@ -75,8 +75,10 @@ export function CategoryPicker({ selected, onSelect, onClose }: CategoryPickerPr
                   onClick={() => { onSelect(cat); onClose(); }}
                   className="w-full flex items-center gap-3 px-4 py-3 active:bg-[var(--background)] transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/5 flex items-center justify-center text-xl flex-shrink-0">
-                    {cat.icon}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cat.colorClass}`}>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d={cat.svgPath} />
+                    </svg>
                   </div>
                   <span className="flex-1 text-left text-[15px] font-medium text-[var(--foreground)]">{cat.name}</span>
                   {selected?.id === cat.id && (
