@@ -37,7 +37,7 @@ export default async function LandingPage() {
           </p>
 
           <Link
-            href="/login"
+            href="/login?mode=signup"
             className="block w-full py-3 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold text-center active:opacity-80 transition-opacity"
           >
             Get started
