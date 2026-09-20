@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { StepIndicator } from "@/components/step-indicator";
 import { StepBasics } from "@/components/step-basics";
 import { StepCurrency } from "@/components/step-currency";
@@ -37,6 +38,8 @@ export default function GroupWizard() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const updateFormData = (partial: Partial<GroupFormData>) => {
     setFormData((prev) => ({ ...prev, ...partial }));
@@ -58,9 +61,51 @@ export default function GroupWizard() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setIsSubmitting(false);
-    setIsSuccess(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      const { data: group, error: groupError } = await supabase
+        .from("groups")
+        .insert({
+          name: formData.name.trim(),
+          type: formData.tripType,
+          base_currency: formData.baseCurrency,
+          spend_currency: formData.spendCurrency,
+          fx_mode: formData.fxMode,
+          fixed_fx_rate: formData.fixedFxRate,
+          simplify_debts: formData.simplifyDebts,
+          created_by: user.id,
+        })
+        .select("id")
+        .single();
+      if (groupError) throw groupError;
+
+      const displayName =
+        (user.user_metadata?.display_name as string) ||
+        user.email?.split("@")[0] ||
+        "You";
+
+      const { error: memberError } = await supabase.from("group_members").insert({
+        group_id: group.id,
+        user_id: user.id,
+        name: displayName,
+        avatar: displayName[0]?.toUpperCase() || "Y",
+      });
+      if (memberError) throw memberError;
+
+      setCreatedGroupId(group.id);
+      setIsSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create group");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSuccess) {
@@ -75,7 +120,7 @@ export default function GroupWizard() {
           <h2 className="text-xl font-bold text-[var(--foreground)] mb-1">Group created</h2>
           <p className="text-sm text-[var(--muted)] mb-6">&quot;{formData.name}&quot; is ready</p>
           <button
-            onClick={() => router.push("/trip/malaysia-2026")}
+            onClick={() => router.push(createdGroupId ? `/trip/${createdGroupId}` : "/")}
             className="w-full max-w-xs py-3 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold active:opacity-80 transition-opacity"
           >
             Go to trip
@@ -113,6 +158,9 @@ export default function GroupWizard() {
 
       {/* Bottom actions */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[var(--border-color)] px-4 py-3" style={{ paddingBottom: "calc(12px + var(--safe-bottom))" }}>
+        {error && (
+          <p className="text-xs font-medium text-[var(--error)] bg-[var(--error)]/5 border border-[var(--error)]/20 rounded-xl px-4 py-2.5 mb-3">{error}</p>
+        )}
         <div className="flex gap-3">
           {currentStep > 1 && (
             <button
