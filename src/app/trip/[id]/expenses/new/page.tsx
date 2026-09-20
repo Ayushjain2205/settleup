@@ -76,6 +76,27 @@ export default function AddExpensePage() {
       </header>
 
       <main className="px-4 py-4 space-y-5">
+        {/* Scan Receipt — primary action */}
+        <button className="w-full flex flex-col items-center gap-2 py-6 bg-[var(--primary)]/[0.04] border-2 border-dashed border-[var(--primary)]/30 rounded-xl active:bg-[var(--primary)]/[0.08] transition-colors">
+          <div className="w-12 h-12 rounded-full bg-[var(--primary)]/10 flex items-center justify-center">
+            <svg className="w-6 h-6 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-[var(--primary)]">Scan receipt</div>
+            <div className="text-[11px] text-[var(--muted)]">AI extracts items and amounts</div>
+          </div>
+        </button>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-[var(--border-color)]" />
+          <span className="text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider">or enter manually</span>
+          <div className="flex-1 h-px bg-[var(--border-color)]" />
+        </div>
+
         {/* Amount */}
         <div className="py-3">
           <div className="flex items-center justify-center gap-1.5 mb-3">
@@ -326,15 +347,6 @@ export default function AddExpensePage() {
             </button>
           </div>
         )}
-
-        {/* Receipt */}
-        <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-[var(--border-color)] rounded-xl text-xs font-medium text-[var(--muted)] transition-colors">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          Scan Receipt
-        </button>
       </main>
 
       {/* Submit */}
