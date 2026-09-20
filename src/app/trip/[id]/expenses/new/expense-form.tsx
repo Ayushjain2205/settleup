@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { computeSplitOwes } from "@/lib/splits";
+import { compressImage, mapScanToLines, type ScanResult } from "@/lib/scan";
 import { PayerPicker } from "@/components/payer-picker";
 import { SplitOptions, type SplitItem } from "@/components/split-options";
 import { CategoryPicker } from "@/components/category-picker";
@@ -47,6 +48,8 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
   const [useBaseCurrency, setUseBaseCurrency] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Smart auto-categorization: guess category from description
   useEffect(() => {
@@ -148,6 +151,36 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
 
   const handlePayerSelect = (id: string) => {
     setPaidBy(id);
+  };
+
+  const handleScanPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || isScanning) return;
+    setIsScanning(true);
+    setError(null);
+    try {
+      const blob = await compressImage(file);
+      const form = new FormData();
+      form.append("image", blob, "receipt.jpg");
+      const res = await fetch("/api/scan-receipt", { method: "POST", body: form });
+      const scan: ScanResult & { error?: string } = await res.json();
+      if (!res.ok) throw new Error(scan.error || "Could not read receipt");
+
+      const memberIds = members.map((m) => m.id);
+      const lines = mapScanToLines(scan, memberIds);
+      if (scan.merchant) setTitle(scan.merchant);
+      if (scan.total > 0) setAmount(String(scan.total));
+      if (scan.date && /^\d{4}-\d{2}-\d{2}$/.test(scan.date)) setExpenseDate(scan.date);
+      if (lines.length > 0) {
+        setItems(lines);
+        setSplitMode("itemized");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not read receipt");
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const handleSplitConfirm = (mode: SplitMode, selected: string[], exact: Record<string, string>, pcts: Record<string, string>, confirmedItems: SplitItem[]) => {
@@ -277,12 +310,26 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
             </svg>
             <span className="font-medium">{group.name}</span>
           </button>
-          <button className="p-2 text-[var(--primary)]" title="Scan receipt">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+          <button className="p-2 text-[var(--primary)]" title="Scan receipt" onClick={() => fileRef.current?.click()} disabled={isScanning}>
+            {isScanning ? (
+              <svg className="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            )}
           </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleScanPick}
+            className="sr-only"
+          />
           <button className="p-2 text-[var(--primary)]" title="Add note">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
