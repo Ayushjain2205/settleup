@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import { SwRegister } from "@/components/sw-register";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -11,12 +12,29 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "SettleUp — Group Expense Tracker",
   description: "Track group expenses, split bills, and settle up with friends. Zero paywalls, dual-currency support, and smart debt simplification.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "SettleUp",
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#7c3aed",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SwRegister />
+        {children}
+      </body>
     </html>
   );
 }
