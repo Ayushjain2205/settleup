@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MOCK_TRIPS } from "@/lib/mock-data";
+import { BottomNav } from "@/components/bottom-nav";
 
 export default function GroupsPage() {
   return (
@@ -89,6 +90,8 @@ export default function GroupsPage() {
           </div>
         )}
       </main>
+
+      <BottomNav />
     </div>
   );
 }
