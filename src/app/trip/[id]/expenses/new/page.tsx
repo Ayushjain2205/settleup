@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MOCK_TRIP } from "@/lib/mock-data";
 
-type SplitMode = "equal" | "exact" | "itemized";
+type SplitMode = "equal" | "exact" | "percent";
 
 export default function AddExpensePage() {
   const router = useRouter();
@@ -16,6 +16,8 @@ export default function AddExpensePage() {
   const [paidBy, setPaidBy] = useState(trip.members[0].id);
   const [splitMode, setSplitMode] = useState<SplitMode>("equal");
   const [selectedMembers, setSelectedMembers] = useState<string[]>(trip.members.map((m) => m.id));
+  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>({});
+  const [percentages, setPercentages] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const currency = useBaseCurrency ? trip.baseCurrency : trip.spendCurrency;
@@ -27,7 +29,19 @@ export default function AddExpensePage() {
     setSelectedMembers((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
   };
 
-  const canSubmit = amountNum > 0 && title.trim().length > 0 && selectedMembers.length > 0;
+  // Calculate exact split totals
+  const totalExact = Object.values(exactAmounts).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+  const exactRemaining = convertedAmount - totalExact;
+
+  // Calculate percent split
+  const totalPercent = Object.values(percentages).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+  const percentRemaining = 100 - totalPercent;
+
+  const canSubmit = amountNum > 0 && title.trim().length > 0 && selectedMembers.length > 0 && (
+    splitMode === "equal" ||
+    (splitMode === "exact" && Math.abs(exactRemaining) < 0.01) ||
+    (splitMode === "percent" && Math.abs(percentRemaining) < 0.01 && totalPercent === 100)
+  );
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -36,6 +50,8 @@ export default function AddExpensePage() {
     setIsSubmitting(false);
     router.push(`/trip/${trip.id}`);
   };
+
+  const getSymbol = () => currency === "INR" ? "₹" : currency === "MYR" ? "RM" : "$";
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -65,7 +81,7 @@ export default function AddExpensePage() {
 
           <div className="relative">
             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-2xl font-light text-[var(--muted)]/30">
-              {currency === "INR" ? "₹" : currency === "MYR" ? "RM" : "$"}
+              {getSymbol()}
             </span>
             <input
               type="number"
@@ -107,27 +123,115 @@ export default function AddExpensePage() {
         <div className="space-y-2">
           <label className="block text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Split</label>
           <div className="flex gap-1 p-0.5 bg-[var(--border-color)]/30 rounded-lg">
-            {(["equal", "exact", "itemized"] as const).map((mode) => (
+            {(["equal", "exact", "percent"] as const).map((mode) => (
               <button key={mode} onClick={() => setSplitMode(mode)} className={`flex-1 py-2 px-2 rounded-md text-xs font-semibold transition-colors ${splitMode === mode ? "bg-white text-[var(--foreground)]" : "text-[var(--muted)]"}`}>
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                {mode === "equal" ? "Equal" : mode === "exact" ? "Exact" : "%"}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Split Details */}
+        {/* Equal Split */}
         {splitMode === "equal" && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--muted)]">Split {selectedMembers.length} ways</span>
-              {amountNum > 0 && <span className="text-xs font-semibold text-[var(--foreground)]">₹{perPerson.toLocaleString(undefined, { maximumFractionDigits: 0 })} each</span>}
+              {amountNum > 0 && <span className="text-xs font-semibold text-[var(--foreground)]">{getSymbol()}{perPerson.toLocaleString(undefined, { maximumFractionDigits: 0 })} each</span>}
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="bg-white border border-[var(--border-color)] rounded-xl divide-y divide-[var(--border-color)]">
               {trip.members.map((member) => (
-                <button key={member.id} onClick={() => toggleMember(member.id)} className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${selectedMembers.includes(member.id) ? "bg-[var(--primary)] text-white" : "bg-white border border-[var(--border-color)] text-[var(--muted)]"}`}>
-                  {member.avatar}
+                <button key={member.id} onClick={() => toggleMember(member.id)} className="w-full flex items-center gap-3 px-3 py-2.5">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${selectedMembers.includes(member.id) ? "bg-[var(--primary)] text-white" : "bg-[var(--border-color)]/50 text-[var(--muted)]"}`}>
+                    {member.avatar}
+                  </div>
+                  <span className="flex-1 text-left text-sm font-medium text-[var(--foreground)]">{member.name}</span>
+                  {selectedMembers.includes(member.id) && amountNum > 0 && (
+                    <span className="text-xs font-semibold text-[var(--foreground)]">{getSymbol()}{perPerson.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  )}
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selectedMembers.includes(member.id) ? "border-[var(--primary)] bg-[var(--primary)]" : "border-[var(--border-color)]"}`}>
+                    {selectedMembers.includes(member.id) && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Exact Split */}
+        {splitMode === "exact" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--muted)]">Enter amounts</span>
+              <span className={`text-xs font-semibold ${Math.abs(exactRemaining) < 0.01 ? "text-[var(--success)]" : exactRemaining > 0 ? "text-[var(--accent)]" : "text-[var(--error)]"}`}>
+                {exactRemaining > 0.01 ? `${getSymbol()}${exactRemaining.toLocaleString(undefined, { maximumFractionDigits: 0 })} left` : exactRemaining < -0.01 ? `${getSymbol()}${Math.abs(exactRemaining).toLocaleString(undefined, { maximumFractionDigits: 0 })} over` : "Balanced"}
+              </span>
+            </div>
+            <div className="bg-white border border-[var(--border-color)] rounded-xl divide-y divide-[var(--border-color)]">
+              {trip.members.map((member) => (
+                <div key={member.id} className="flex items-center gap-3 px-3 py-2">
+                  <div className="w-7 h-7 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[10px] font-bold text-[var(--primary)]">
+                    {member.avatar}
+                  </div>
+                  <span className="flex-1 text-sm font-medium text-[var(--foreground)]">{member.name}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-[var(--muted)]">{getSymbol()}</span>
+                    <input
+                      type="number"
+                      value={exactAmounts[member.id] || ""}
+                      onChange={(e) => setExactAmounts((prev) => ({ ...prev, [member.id]: e.target.value }))}
+                      placeholder="0"
+                      className="w-20 text-right text-sm font-semibold text-[var(--foreground)] bg-transparent border-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Percent Split */}
+        {splitMode === "percent" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--muted)]">Enter percentages</span>
+              <span className={`text-xs font-semibold ${Math.abs(percentRemaining) < 0.01 ? "text-[var(--success)]" : percentRemaining > 0 ? "text-[var(--accent)]" : "text-[var(--error)]"}`}>
+                {percentRemaining > 0.01 ? `${percentRemaining.toFixed(1)}% left` : percentRemaining < -0.01 ? `${Math.abs(percentRemaining).toFixed(1)}% over` : "100%"}
+              </span>
+            </div>
+            <div className="bg-white border border-[var(--border-color)] rounded-xl divide-y divide-[var(--border-color)]">
+              {trip.members.map((member) => {
+                const pct = parseFloat(percentages[member.id]) || 0;
+                const memberAmount = convertedAmount * (pct / 100);
+                return (
+                  <div key={member.id} className="flex items-center gap-3 px-3 py-2">
+                    <div className="w-7 h-7 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[10px] font-bold text-[var(--primary)]">
+                      {member.avatar}
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-[var(--foreground)]">{member.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {pct > 0 && (
+                        <span className="text-[10px] text-[var(--muted)]">{getSymbol()}{memberAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={percentages[member.id] || ""}
+                          onChange={(e) => setPercentages((prev) => ({ ...prev, [member.id]: e.target.value }))}
+                          placeholder="0"
+                          className="w-14 text-right text-sm font-semibold text-[var(--foreground)] bg-transparent border-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-xs text-[var(--muted)]">%</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
