@@ -4,6 +4,12 @@ import { useState } from "react";
 
 type SplitMode = "equal" | "exact" | "percent" | "itemized";
 
+export interface SplitItem {
+  name: string;
+  amount: string;
+  splitAmong: string[];
+}
+
 interface SplitOptionsProps {
   amount: number;
   symbol: string;
@@ -12,8 +18,9 @@ interface SplitOptionsProps {
   initialSelected: string[];
   initialExactAmounts: Record<string, string>;
   initialPercentages: Record<string, string>;
+  initialItems: SplitItem[];
   onClose: () => void;
-  onConfirm: (mode: SplitMode, selected: string[], exactAmounts: Record<string, string>, percentages: Record<string, string>) => void;
+  onConfirm: (mode: SplitMode, selected: string[], exactAmounts: Record<string, string>, percentages: Record<string, string>, items: SplitItem[]) => void;
 }
 
 const MODES: { key: SplitMode; icon: string; label: string }[] = [
@@ -38,6 +45,7 @@ export function SplitOptions({
   initialSelected,
   initialExactAmounts,
   initialPercentages,
+  initialItems,
   onClose,
   onConfirm,
 }: SplitOptionsProps) {
@@ -45,9 +53,9 @@ export function SplitOptions({
   const [selected, setSelected] = useState<string[]>(initialSelected);
   const [exactAmounts, setExactAmounts] = useState<Record<string, string>>(initialExactAmounts);
   const [percentages, setPercentages] = useState<Record<string, string>>(initialPercentages);
-  const [items, setItems] = useState<{ name: string; amount: string; splitAmong: string[] }[]>([
-    { name: "", amount: "", splitAmong: members.map((m) => m.id) },
-  ]);
+  const [items, setItems] = useState<SplitItem[]>(
+    initialItems.length > 0 ? initialItems : [{ name: "", amount: "", splitAmong: members.map((m) => m.id) }]
+  );
 
   const perPerson = selected.length > 0 ? amount / selected.length : 0;
 
@@ -66,7 +74,7 @@ export function SplitOptions({
   const percentRemaining = 100 - totalPercent;
 
   const handleConfirm = () => {
-    onConfirm(mode, selected, exactAmounts, percentages);
+    onConfirm(mode, selected, exactAmounts, percentages, items);
     onClose();
   };
 
