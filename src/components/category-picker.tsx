@@ -69,25 +69,26 @@ export function CategoryPicker({ selected, onSelect, onClose }: CategoryPickerPr
               <div className="px-4 py-2">
                 <span className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">{group}</span>
               </div>
-              {cats.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => { onSelect(cat); onClose(); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 active:bg-[var(--background)] transition-colors"
-                >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cat.colorClass}`}>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d={cat.svgPath} />
-                    </svg>
-                  </div>
-                  <span className="flex-1 text-left text-[15px] font-medium text-[var(--foreground)]">{cat.name}</span>
-                  {selected?.id === cat.id && (
-                    <svg className="w-5 h-5 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-              ))}
+              {cats.map((cat) => {
+                const IconComp = cat.Icon;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => { onSelect(cat); onClose(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 active:bg-[var(--background)] transition-colors"
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cat.colorClass}`}>
+                      <IconComp className="w-5 h-5" strokeWidth={1.5} />
+                    </div>
+                    <span className="flex-1 text-left text-[15px] font-medium text-[var(--foreground)]">{cat.name}</span>
+                    {selected?.id === cat.id && (
+                      <svg className="w-5 h-5 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ))}
         </div>
