@@ -7,12 +7,12 @@ interface StepIndicatorProps {
 
 export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
   return (
-    <div className="flex items-center justify-center gap-2">
+    <div className="flex items-center justify-center">
       {steps.map((step, index) => (
         <div key={step.id} className="flex items-center">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
                 currentStep > step.id
                   ? "bg-[var(--success)] text-white"
                   : currentStep === step.id
@@ -21,7 +21,7 @@ export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
               }`}
             >
               {currentStep > step.id ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               ) : (
@@ -29,7 +29,7 @@ export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
               )}
             </div>
             <span
-              className={`text-sm font-semibold transition-colors ${
+              className={`text-xs font-semibold transition-colors hidden sm:inline ${
                 currentStep >= step.id ? "text-[var(--foreground)]" : "text-[var(--muted)]"
               }`}
             >
@@ -38,7 +38,7 @@ export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
           </div>
           {index < steps.length - 1 && (
             <div
-              className={`w-12 h-0.5 mx-3 transition-colors ${
+              className={`w-8 h-0.5 mx-2 transition-colors ${
                 currentStep > step.id ? "bg-[var(--success)]" : "bg-[var(--border-color)]"
               }`}
             />
