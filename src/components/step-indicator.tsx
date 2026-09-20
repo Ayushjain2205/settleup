@@ -12,12 +12,12 @@ export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
         <div key={step.id} className="flex items-center">
           <div className="flex items-center gap-2">
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
                 currentStep > step.id
                   ? "bg-[var(--success)] text-white"
                   : currentStep === step.id
-                  ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/30"
-                  : "bg-[var(--border)] text-[var(--muted)]"
+                  ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
+                  : "bg-[var(--border-color)] text-[var(--muted)]"
               }`}
             >
               {currentStep > step.id ? (
@@ -29,7 +29,7 @@ export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
               )}
             </div>
             <span
-              className={`text-sm font-medium transition-colors duration-200 ${
+              className={`text-sm font-semibold transition-colors ${
                 currentStep >= step.id ? "text-[var(--foreground)]" : "text-[var(--muted)]"
               }`}
             >
@@ -38,8 +38,8 @@ export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
           </div>
           {index < steps.length - 1 && (
             <div
-              className={`w-12 h-0.5 mx-3 transition-colors duration-300 ${
-                currentStep > step.id ? "bg-[var(--success)]" : "bg-[var(--border)]"
+              className={`w-12 h-0.5 mx-3 transition-colors ${
+                currentStep > step.id ? "bg-[var(--success)]" : "bg-[var(--border-color)]"
               }`}
             />
           )}

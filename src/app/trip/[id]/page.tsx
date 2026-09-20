@@ -24,15 +24,15 @@ export default function TripPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
         <QuickActions tripId={trip.id} />
 
-        {/* Tab Navigation */}
-        <div className="flex gap-1 p-1 bg-[var(--surface)] rounded-xl border border-[var(--border)] mb-6">
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 bg-[var(--foreground)]/[0.03] rounded-2xl border border-[var(--border-color)] mb-8">
           {(["expenses", "balances", "settle"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+              className={`flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 ${
                 activeTab === tab
-                  ? "bg-[var(--primary)] text-white shadow-sm"
+                  ? "bg-white text-[var(--foreground)] shadow-sm"
                   : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
@@ -43,83 +43,56 @@ export default function TripPage() {
           ))}
         </div>
 
-        {/* Tab Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 animate-fade-in" key={activeTab}>
-            {activeTab === "expenses" && (
-              <ExpensesList
-                expenses={trip.expenses}
-                members={trip.members}
-                baseCurrency={trip.baseCurrency}
-              />
-            )}
-            {activeTab === "balances" && (
-              <BalancesPanel
-                balances={trip.balances}
-                members={trip.members}
-                baseCurrency={trip.baseCurrency}
-              />
-            )}
-            {activeTab === "settle" && (
-              <SettleTab
-                settlements={trip.settlements}
-                members={trip.members}
-                baseCurrency={trip.baseCurrency}
-              />
-            )}
+        {/* Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 animate-fade-up" key={activeTab}>
+            {activeTab === "expenses" && <ExpensesList expenses={trip.expenses} members={trip.members} />}
+            {activeTab === "balances" && <BalancesPanel balances={trip.balances} members={trip.members} />}
+            {activeTab === "settle" && <SettleTab settlements={trip.settlements} members={trip.members} />}
           </div>
 
           {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-4 stagger-children">
-            <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-5">
-              <h3 className="font-semibold text-[var(--foreground)] mb-4">Trip Summary</h3>
-              <dl className="space-y-3">
+          <div className="lg:col-span-1 space-y-6 stagger">
+            <div className="p-6 rounded-3xl bg-gradient-to-br from-[var(--primary)]/[0.06] to-[var(--accent)]/[0.04] border border-[var(--border-color)]">
+              <h3 className="text-sm font-semibold text-[var(--muted)] uppercase tracking-wider mb-4">Trip Summary</h3>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-4xl font-bold text-[var(--foreground)]">₹{totalSpent.toLocaleString()}</div>
+                  <div className="text-sm text-[var(--muted)]">total spent</div>
+                </div>
+                <div className="w-full h-px bg-[var(--border-color)]" />
                 <div className="flex justify-between">
-                  <dt className="text-sm text-[var(--muted)]">Total Spent</dt>
-                  <dd className="font-semibold text-[var(--foreground)]">
-                    ₹{totalSpent.toLocaleString()}
-                  </dd>
+                  <span className="text-[var(--muted)]">Per person</span>
+                  <span className="font-bold text-[var(--foreground)]">₹{perPerson.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-sm text-[var(--muted)]">Per Person</dt>
-                  <dd className="font-semibold text-[var(--foreground)]">
-                    ₹{perPerson.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                  </dd>
+                  <span className="text-[var(--muted)]">Expenses</span>
+                  <span className="font-bold text-[var(--foreground)]">{trip.expenses.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-sm text-[var(--muted)]">Expenses</dt>
-                  <dd className="font-semibold text-[var(--foreground)]">{trip.expenses.length}</dd>
+                  <span className="text-[var(--muted)]">Members</span>
+                  <span className="font-bold text-[var(--foreground)]">{trip.members.length}</span>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-[var(--muted)]">Members</dt>
-                  <dd className="font-semibold text-[var(--foreground)]">{trip.members.length}</dd>
-                </div>
-              </dl>
+              </div>
             </div>
 
-            <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-5">
-              <h3 className="font-semibold text-[var(--foreground)] mb-3">Members</h3>
-              <div className="space-y-2">
+            <div className="p-6 rounded-3xl bg-white border border-[var(--border-color)]">
+              <h3 className="text-sm font-semibold text-[var(--muted)] uppercase tracking-wider mb-4">Members</h3>
+              <div className="space-y-3">
                 {trip.members.map((member) => {
                   const balance = trip.balances.find((b) => b.memberId === member.id);
                   return (
                     <div key={member.id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-xs font-semibold text-[var(--primary)]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-xs font-bold text-white">
                           {member.avatar}
                         </div>
-                        <span className="text-sm text-[var(--foreground)]">{member.name}</span>
+                        <span className="font-semibold text-[var(--foreground)]">{member.name}</span>
                       </div>
                       {balance && (
-                        <span
-                          className={`text-sm font-medium ${
-                            balance.amount > 0
-                              ? "text-[var(--success)]"
-                              : balance.amount < 0
-                              ? "text-[var(--error)]"
-                              : "text-[var(--muted)]"
-                          }`}
-                        >
+                        <span className={`text-sm font-bold ${
+                          balance.amount > 0 ? "text-[var(--success)]" : balance.amount < 0 ? "text-[var(--error)]" : "text-[var(--muted)]"
+                        }`}>
                           {balance.amount > 0 ? "+" : ""}₹{balance.amount.toLocaleString()}
                         </span>
                       )}

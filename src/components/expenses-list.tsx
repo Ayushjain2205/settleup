@@ -5,7 +5,6 @@ import type { Expense, Member } from "@/lib/mock-data";
 interface ExpensesListProps {
   expenses: Expense[];
   members: Member[];
-  baseCurrency?: string;
 }
 
 const CATEGORY_ICONS: Record<Expense["category"], string> = {
@@ -16,12 +15,12 @@ const CATEGORY_ICONS: Record<Expense["category"], string> = {
   other: "📦",
 };
 
-const CATEGORY_COLORS: Record<Expense["category"], string> = {
-  food: "bg-orange-100 text-orange-700",
-  transport: "bg-blue-100 text-blue-700",
-  activity: "bg-purple-100 text-purple-700",
-  accommodation: "bg-green-100 text-green-700",
-  other: "bg-gray-100 text-gray-700",
+const CATEGORY_BG: Record<Expense["category"], string> = {
+  food: "bg-orange-100",
+  transport: "bg-blue-100",
+  activity: "bg-purple-100",
+  accommodation: "bg-green-100",
+  other: "bg-stone-100",
 };
 
 export function ExpensesList({ expenses, members }: ExpensesListProps) {
@@ -32,75 +31,57 @@ export function ExpensesList({ expenses, members }: ExpensesListProps) {
   }, {} as Record<string, Expense[]>);
 
   const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
-
   const getMemberName = (id: string) => members.find((m) => m.id === id)?.name || id;
   const getMemberAvatar = (id: string) => members.find((m) => m.id === id)?.avatar || "?";
 
   if (expenses.length === 0) {
     return (
-      <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-12 text-center">
-        <div className="w-16 h-16 bg-[var(--primary)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-3xl">📝</span>
-        </div>
-        <h3 className="font-semibold text-[var(--foreground)] mb-2">No expenses yet</h3>
-        <p className="text-sm text-[var(--muted)]">Add your first expense to get started</p>
+      <div className="p-16 text-center rounded-3xl bg-white border border-[var(--border-color)]">
+        <div className="text-5xl mb-4">📝</div>
+        <h3 className="text-xl font-bold text-[var(--foreground)] mb-2">No expenses yet</h3>
+        <p className="text-[var(--muted)]">Add your first expense to get started</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {sortedDates.map((date) => {
         const dayExpenses = groupedByDate[date];
         const dayTotal = dayExpenses.reduce((sum, e) => sum + e.baseAmount, 0);
 
         return (
           <div key={date}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-[var(--muted)]">
-                {new Date(date).toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "short",
-                  day: "numeric",
-                })}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-[var(--muted)] uppercase tracking-wider">
+                {new Date(date).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
               </h3>
-              <span className="text-sm text-[var(--muted)]">
-                ₹{dayTotal.toLocaleString()}
-              </span>
+              <span className="text-sm font-medium text-[var(--muted)]">₹{dayTotal.toLocaleString()}</span>
             </div>
 
-            <div className="space-y-2 stagger-children">
+            <div className="space-y-3 stagger">
               {dayExpenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 hover:shadow-sm transition-shadow cursor-pointer card-hover"
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-[var(--border-color)] hover:shadow-md hover:border-[var(--primary)]/20 transition-all duration-200 cursor-pointer card-lift"
                 >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${CATEGORY_COLORS[expense.category]}`}>
-                      {CATEGORY_ICONS[expense.category]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-[var(--foreground)] truncate">
-                          {expense.title}
-                        </h4>
-                        <span className="font-semibold text-[var(--foreground)] ml-2">
-                          ₹{expense.baseAmount.toLocaleString()}
-                        </span>
+                  <div className={`w-12 h-12 rounded-2xl ${CATEGORY_BG[expense.category]} flex items-center justify-center text-xl`}>
+                    {CATEGORY_ICONS[expense.category]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-[var(--foreground)] truncate">{expense.title}</h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="w-4 h-4 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[8px] font-bold text-[var(--primary)]">
+                        {getMemberAvatar(expense.paidBy)}
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="w-5 h-5 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[10px] font-semibold text-[var(--primary)]">
-                          {getMemberAvatar(expense.paidBy)}
-                        </div>
-                        <span className="text-xs text-[var(--muted)]">
-                          Paid by {getMemberName(expense.paidBy)}
-                        </span>
-                        <span className="text-xs text-[var(--muted)]">•</span>
-                        <span className="text-xs text-[var(--muted)]">
-                          Split {expense.splitAmong.length} ways
-                        </span>
-                      </div>
+                      <span className="text-xs text-[var(--muted)]">
+                        {getMemberName(expense.paidBy)} · {expense.splitAmong.length} ways
+                      </span>
                     </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-[var(--foreground)]">₹{expense.baseAmount.toLocaleString()}</div>
+                    <div className="text-xs text-[var(--muted)]">{expense.amount} {expense.currency}</div>
                   </div>
                 </div>
               ))}

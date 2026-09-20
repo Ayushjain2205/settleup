@@ -49,15 +49,11 @@ export default function GroupWizard() {
   };
 
   const handleNext = () => {
-    if (currentStep < 3 && canProceed()) {
-      setCurrentStep((s) => s + 1);
-    }
+    if (currentStep < 3 && canProceed()) setCurrentStep((s) => s + 1);
   };
 
   const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep((s) => s - 1);
-    }
+    if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
   const handleSubmit = async () => {
@@ -69,22 +65,22 @@ export default function GroupWizard() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="text-center space-y-6 animate-fade-in">
-          <div className="w-20 h-20 bg-[var(--success)] rounded-full flex items-center justify-center mx-auto animate-scale-in">
-            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+        <div className="text-center space-y-8 animate-scale-in">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[var(--success)] to-emerald-400 flex items-center justify-center mx-auto shadow-xl shadow-[var(--success)]/20">
+            <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <div>
-            <h2 className="text-3xl font-bold text-[var(--foreground)]">Group Created!</h2>
-            <p className="text-[var(--muted)] mt-2 text-lg">&quot;{formData.name}&quot; is ready for expenses</p>
+            <h2 className="text-4xl md:text-5xl font-bold text-[var(--foreground)] mb-3">Group created</h2>
+            <p className="text-lg text-[var(--muted)]">&quot;{formData.name}&quot; is ready for expenses</p>
           </div>
           <button
-            onClick={() => router.push("/")}
-            className="px-8 py-3 bg-[var(--primary)] text-white rounded-xl font-semibold hover:bg-[var(--primary-dark)] transition-all duration-200 shadow-lg hover:shadow-xl btn-press"
+            onClick={() => router.push("/trip/malaysia-2026")}
+            className="px-8 py-4 bg-[var(--primary)] text-white rounded-2xl font-semibold text-lg hover:opacity-90 transition-all btn-press shadow-lg shadow-[var(--primary)]/25"
           >
-            Go to Dashboard
+            Go to trip
           </button>
         </div>
       </div>
@@ -92,39 +88,38 @@ export default function GroupWizard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="p-6 border-b border-[var(--border)]">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div className="w-10 h-10 bg-[var(--primary)] rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-lg">S</span>
-          </div>
-          <span className="font-bold text-xl text-[var(--foreground)]">SettleUp</span>
+    <div className="min-h-screen bg-[var(--background)] relative overflow-hidden">
+      <div className="fixed top-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[var(--primary)]/[0.05] blur-[100px] pointer-events-none" />
+
+      <header className="relative z-10 px-6 md:px-12 py-6">
+        <div className="max-w-3xl mx-auto flex items-center gap-3">
+          <button
+            onClick={() => router.push("/")}
+            className="w-10 h-10 rounded-xl bg-white border border-[var(--border-color)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--foreground)]/20 transition-all shadow-sm"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <span className="font-bold text-lg text-[var(--foreground)]">New Group</span>
         </div>
       </header>
 
-      <main className="flex-1 flex items-start justify-center p-6 pt-12">
-        <div className="w-full max-w-2xl">
+      <main className="relative z-10 flex items-start justify-center px-6 pt-8 pb-24">
+        <div className="w-full max-w-3xl">
           <StepIndicator steps={STEPS} currentStep={currentStep} />
 
-          <div className="mt-8 bg-[var(--surface)] rounded-2xl shadow-sm border border-[var(--border)] p-8">
-            <div key={currentStep} className="animate-fade-in">
-              {currentStep === 1 && (
-                <StepBasics formData={formData} updateFormData={updateFormData} />
-              )}
-              {currentStep === 2 && (
-                <StepCurrency formData={formData} updateFormData={updateFormData} />
-              )}
-              {currentStep === 3 && (
-                <StepDebts formData={formData} updateFormData={updateFormData} />
-              )}
-            </div>
+          <div className="mt-12 animate-fade-up" key={currentStep}>
+            {currentStep === 1 && <StepBasics formData={formData} updateFormData={updateFormData} />}
+            {currentStep === 2 && <StepCurrency formData={formData} updateFormData={updateFormData} />}
+            {currentStep === 3 && <StepDebts formData={formData} updateFormData={updateFormData} />}
           </div>
 
-          <div className="flex justify-between mt-6">
+          <div className="flex justify-between mt-12">
             <button
               onClick={handleBack}
               disabled={currentStep === 1}
-              className="px-6 py-3 text-[var(--muted)] font-medium rounded-xl hover:bg-[var(--surface)] transition-colors disabled:opacity-0 disabled:pointer-events-none"
+              className="px-6 py-3 text-[var(--muted)] font-medium rounded-xl hover:text-[var(--foreground)] transition-colors disabled:opacity-0 disabled:pointer-events-none"
             >
               Back
             </button>
@@ -133,7 +128,7 @@ export default function GroupWizard() {
               <button
                 onClick={handleNext}
                 disabled={!canProceed()}
-                className="px-8 py-3 bg-[var(--primary)] text-white rounded-xl font-semibold hover:bg-[var(--primary-dark)] transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg"
+                className="px-8 py-3 bg-[var(--foreground)] text-[var(--background)] rounded-xl font-semibold hover:opacity-90 transition-all btn-press disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 Continue
               </button>
@@ -141,7 +136,7 @@ export default function GroupWizard() {
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="px-8 py-3 bg-[var(--accent)] text-white rounded-xl font-semibold hover:opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-70"
+                className="px-8 py-3 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-xl font-semibold hover:opacity-90 transition-all btn-press disabled:opacity-70 shadow-lg shadow-[var(--primary)]/25"
               >
                 {isSubmitting ? (
                   <span className="flex items-center gap-2">
