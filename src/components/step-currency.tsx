@@ -1,24 +1,12 @@
 "use client";
 
 import type { GroupFormData } from "@/app/groups/new/page";
+import { CurrencyPicker } from "@/components/currency-picker";
 
 interface StepCurrencyProps {
   formData: GroupFormData;
   updateFormData: (partial: Partial<GroupFormData>) => void;
 }
-
-const CURRENCIES = [
-  { code: "INR", name: "Indian Rupee", symbol: "₹" },
-  { code: "MYR", name: "Malaysian Ringgit", symbol: "RM" },
-  { code: "THB", name: "Thai Baht", symbol: "฿" },
-  { code: "USD", name: "US Dollar", symbol: "$" },
-  { code: "EUR", name: "Euro", symbol: "€" },
-  { code: "GBP", name: "British Pound", symbol: "£" },
-  { code: "SGD", name: "Singapore Dollar", symbol: "S$" },
-  { code: "AED", name: "UAE Dirham", symbol: "د.إ" },
-  { code: "JPY", name: "Japanese Yen", symbol: "¥" },
-  { code: "AUD", name: "Australian Dollar", symbol: "A$" },
-];
 
 export function StepCurrency({ formData, updateFormData }: StepCurrencyProps) {
   const isInternational = formData.tripType === "international";
@@ -32,15 +20,10 @@ export function StepCurrency({ formData, updateFormData }: StepCurrencyProps) {
         </div>
         <div className="space-y-2">
           <label className="block text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Currency</label>
-          <select
+          <CurrencyPicker
             value={formData.baseCurrency}
-            onChange={(e) => updateFormData({ baseCurrency: e.target.value, spendCurrency: e.target.value })}
-            className="w-full px-0 py-2.5 bg-transparent border-0 border-b border-[var(--border-color)] text-base text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] transition-colors appearance-none cursor-pointer"
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c.code} value={c.code}>{c.symbol} {c.code} — {c.name}</option>
-            ))}
-          </select>
+            onChange={(code) => updateFormData({ baseCurrency: code, spendCurrency: code })}
+          />
         </div>
       </div>
     );
@@ -57,28 +40,18 @@ export function StepCurrency({ formData, updateFormData }: StepCurrencyProps) {
         <div className="space-y-2">
           <label className="block text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Base currency</label>
           <p className="text-[10px] text-[var(--muted)]">Debts settle in this</p>
-          <select
+          <CurrencyPicker
             value={formData.baseCurrency}
-            onChange={(e) => updateFormData({ baseCurrency: e.target.value })}
-            className="w-full px-0 py-2.5 bg-transparent border-0 border-b border-[var(--border-color)] text-base text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] transition-colors appearance-none cursor-pointer"
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c.code} value={c.code}>{c.symbol} {c.code}</option>
-            ))}
-          </select>
+            onChange={(code) => updateFormData({ baseCurrency: code })}
+          />
         </div>
         <div className="space-y-2">
           <label className="block text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Spend currency</label>
           <p className="text-[10px] text-[var(--muted)]">Default for expenses</p>
-          <select
+          <CurrencyPicker
             value={formData.spendCurrency}
-            onChange={(e) => updateFormData({ spendCurrency: e.target.value })}
-            className="w-full px-0 py-2.5 bg-transparent border-0 border-b border-[var(--border-color)] text-base text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] transition-colors appearance-none cursor-pointer"
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c.code} value={c.code}>{c.symbol} {c.code}</option>
-            ))}
-          </select>
+            onChange={(code) => updateFormData({ spendCurrency: code })}
+          />
         </div>
       </div>
 
