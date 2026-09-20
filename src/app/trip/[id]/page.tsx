@@ -17,9 +17,6 @@ export default function TripPage() {
   const initialTab = (searchParams.get("tab") as Tab) || "expenses";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
-  const totalSpent = trip.expenses.reduce((sum, e) => sum + e.baseAmount, 0);
-  const perPerson = totalSpent / trip.members.length;
-
   return (
     <div className="min-h-screen bg-[var(--background)]">
       {/* Header */}
@@ -30,16 +27,7 @@ export default function TripPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
-          <div className="flex-1">
-            <h1 className="text-base font-semibold text-[var(--foreground)] leading-tight">{trip.name}</h1>
-            <p className="text-[11px] text-[var(--muted)]">
-              {trip.spendCurrency} → {trip.baseCurrency} · {trip.members.length} members
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-bold text-[var(--foreground)]">₹{totalSpent.toLocaleString()}</div>
-            <div className="text-[10px] text-[var(--muted)]">₹{perPerson.toLocaleString(undefined, { maximumFractionDigits: 0 })}/person</div>
-          </div>
+          <h1 className="text-base font-semibold text-[var(--foreground)]">{trip.name}</h1>
         </div>
 
         {/* Tab bar — group-level */}
