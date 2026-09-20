@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { MOCK_TRIP, type Trip } from "@/lib/mock-data";
+import { BottomNav } from "@/components/bottom-nav";
 import { ExpensesList } from "@/components/expenses-list";
 import { BalancesPanel } from "@/components/balances-panel";
 import { SettleTab } from "@/components/settle-tab";
@@ -41,7 +42,7 @@ export default function TripPage() {
           </div>
         </div>
 
-        {/* Tab bar */}
+        {/* Tab bar — group-level */}
         <div className="flex px-4 gap-0">
           {(["expenses", "balances", "settle"] as const).map((tab) => (
             <button
@@ -62,18 +63,21 @@ export default function TripPage() {
       </header>
 
       {/* Content */}
-      <main>
+      <main className="pb-20">
         {activeTab === "expenses" && <ExpensesList expenses={trip.expenses} members={trip.members} />}
         {activeTab === "balances" && <BalancesPanel balances={trip.balances} members={trip.members} />}
         {activeTab === "settle" && <SettleTab settlements={trip.settlements} members={trip.members} />}
       </main>
 
       {/* FAB — Add Expense */}
-      <Link href={`/trip/${trip.id}/expenses/new`} className="fab" aria-label="Add expense">
+      <Link href={`/trip/${trip.id}/expenses/new`} className="fab" aria-label="Add expense" style={{ bottom: "calc(64px + var(--safe-bottom) + 16px)" }}>
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
       </Link>
+
+      {/* App-level bottom nav */}
+      <BottomNav />
     </div>
   );
 }
