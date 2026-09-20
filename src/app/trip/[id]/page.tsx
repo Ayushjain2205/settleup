@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { MOCK_TRIP, type Trip } from "@/lib/mock-data";
-import { BottomNav } from "@/components/bottom-nav";
 import { ExpensesList } from "@/components/expenses-list";
 import { BalancesPanel } from "@/components/balances-panel";
 import { SettleTab } from "@/components/settle-tab";
@@ -22,21 +21,19 @@ export default function TripPage() {
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      {/* Header — compact, edge-to-edge */}
+      {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[var(--border-color)]">
-        <div className="flex items-center justify-between h-14 px-4">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="p-1 -ml-1">
-              <svg className="w-5 h-5 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </Link>
-            <div>
-              <h1 className="text-base font-semibold text-[var(--foreground)] leading-tight">{trip.name}</h1>
-              <p className="text-[11px] text-[var(--muted)]">
-                {trip.spendCurrency} → {trip.baseCurrency} · {trip.members.length} members
-              </p>
-            </div>
+        <div className="flex items-center h-14 px-4">
+          <Link href="/" className="p-1 -ml-1 mr-3">
+            <svg className="w-5 h-5 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </Link>
+          <div className="flex-1">
+            <h1 className="text-base font-semibold text-[var(--foreground)] leading-tight">{trip.name}</h1>
+            <p className="text-[11px] text-[var(--muted)]">
+              {trip.spendCurrency} → {trip.baseCurrency} · {trip.members.length} members
+            </p>
           </div>
           <div className="text-right">
             <div className="text-sm font-bold text-[var(--foreground)]">₹{totalSpent.toLocaleString()}</div>
@@ -44,7 +41,7 @@ export default function TripPage() {
           </div>
         </div>
 
-        {/* Tab bar — compact, inline */}
+        {/* Tab bar */}
         <div className="flex px-4 gap-0">
           {(["expenses", "balances", "settle"] as const).map((tab) => (
             <button
@@ -64,8 +61,8 @@ export default function TripPage() {
         </div>
       </header>
 
-      {/* Content — edge-to-edge, padded for bottom nav */}
-      <main className="pb-nav">
+      {/* Content */}
+      <main>
         {activeTab === "expenses" && <ExpensesList expenses={trip.expenses} members={trip.members} />}
         {activeTab === "balances" && <BalancesPanel balances={trip.balances} members={trip.members} />}
         {activeTab === "settle" && <SettleTab settlements={trip.settlements} members={trip.members} />}
@@ -77,9 +74,6 @@ export default function TripPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
       </Link>
-
-      {/* Bottom navigation */}
-      <BottomNav tripId={trip.id} />
     </div>
   );
 }
