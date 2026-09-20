@@ -74,7 +74,7 @@ export function SplitOptions({
     <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40" />
       <div
-        className="relative bg-white rounded-t-2xl max-h-[85vh] flex flex-col"
+        className="relative w-full bg-white rounded-t-2xl max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
