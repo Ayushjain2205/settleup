@@ -56,7 +56,7 @@ export function CategoryPicker({ selected, onSelect, onClose }: CategoryPickerPr
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search categories"
-              className="w-full pl-10 pr-4 py-2.5 bg-[var(--background)] rounded-xl text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 transition-shadow"
+              className="w-full pl-10 pr-4 py-2.5 bg-[var(--background)] rounded-xl text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none"
               autoFocus
             />
           </div>

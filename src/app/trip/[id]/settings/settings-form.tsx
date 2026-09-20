@@ -238,7 +238,7 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="Priya"
                   autoFocus
-                  className="w-full px-4 py-3 bg-[var(--background)] rounded-xl text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 transition-shadow"
+                  className="w-full px-4 py-3 bg-[var(--background)] rounded-xl text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)]/40 focus:outline-none"
                 />
               </div>
               <div className="space-y-1.5">
@@ -248,7 +248,7 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   placeholder="priya@example.com"
-                  className="w-full px-4 py-3 bg-[var(--background)] rounded-xl text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)]/40 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 transition-shadow"
+                  className="w-full px-4 py-3 bg-[var(--background)] rounded-xl text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)]/40 focus:outline-none"
                 />
                 <p className="text-[11px] text-[var(--muted)]">With an email, they join automatically when they sign in.</p>
               </div>
