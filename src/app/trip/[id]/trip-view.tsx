@@ -7,7 +7,7 @@ import type { Balance, Expense, Member, Settlement } from "@/lib/mock-data";
 import { BottomNav } from "@/components/bottom-nav";
 import { ExpensesList } from "@/components/expenses-list";
 import { BalancesPanel } from "@/components/balances-panel";
-import { SettleTab } from "@/components/settle-tab";
+import { SettleTab, type RecordedPayment } from "@/components/settle-tab";
 
 type Tab = "expenses" | "balances" | "settle";
 
@@ -18,9 +18,10 @@ interface TripViewProps {
   expenses: Expense[];
   balances: Balance[];
   settlements: Settlement[];
+  recorded: RecordedPayment[];
 }
 
-export function TripView({ tripId, tripName, members, expenses, balances, settlements }: TripViewProps) {
+export function TripView({ tripId, tripName, members, expenses, balances, settlements, recorded }: TripViewProps) {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") as Tab) || "expenses";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
@@ -69,7 +70,7 @@ export function TripView({ tripId, tripName, members, expenses, balances, settle
       <main className="pb-20">
         {activeTab === "expenses" && <ExpensesList expenses={expenses} members={members} />}
         {activeTab === "balances" && <BalancesPanel balances={balances} members={members} />}
-        {activeTab === "settle" && <SettleTab settlements={settlements} members={members} />}
+        {activeTab === "settle" && <SettleTab groupId={tripId} settlements={settlements} recorded={recorded} members={members} />}
       </main>
 
       {/* FAB — Add Expense */}

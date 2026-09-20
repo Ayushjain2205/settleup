@@ -52,7 +52,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     );
   }
 
-  const [{ data: memberRows }, { data: expenseRows }, { data: splitRows }] = await Promise.all([
+  const [{ data: memberRows }, { data: expenseRows }, { data: splitRows }, { data: recordedRows }] = await Promise.all([
     supabase.from("group_members").select("id, name, avatar, upi_id").eq("group_id", id),
     supabase
       .from("expenses")
@@ -63,6 +63,12 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       .from("expense_splits")
       .select("expense_id, member_id, amount_owed")
       .in("expense_id", (await supabase.from("expenses").select("id").eq("group_id", id)).data?.map((e) => e.id) || ["00000000-0000-0000-0000-000000000000"]),
+    supabase
+      .from("settlements")
+      .select("from_member, to_member, amount, currency, created_at")
+      .eq("group_id", id)
+      .eq("status", "confirmed")
+      .order("created_at", { ascending: false }),
   ]);
 
   const members: Member[] = (memberRows || []).map((m) => ({
@@ -97,6 +103,22 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     splits,
     group.base_currency
   );
+
+  // Fold confirmed payments in: payer owes less, receiver is owed less
+  const recorded = (recordedRows || []).map((r) => ({
+    from: r.from_member,
+    to: r.to_member,
+    amount: Number(r.amount),
+    currency: r.currency,
+    date: r.created_at,
+  }));
+  for (const r of recorded) {
+    const from = balances.find((b) => b.memberId === r.from);
+    const to = balances.find((b) => b.memberId === r.to);
+    if (from) from.amount = Math.round((from.amount + r.amount) * 100) / 100;
+    if (to) to.amount = Math.round((to.amount - r.amount) * 100) / 100;
+  }
+
   const settlements = group.simplify_debts ? simplifyDebts(balances, group.base_currency) : [];
 
   return (
@@ -107,6 +129,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       expenses={expenses}
       balances={balances}
       settlements={settlements}
+      recorded={recorded}
     />
   );
 }
