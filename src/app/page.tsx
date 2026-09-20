@@ -8,7 +8,7 @@ export default function GroupsPage() {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[var(--border-color)]">
         <div className="flex items-center justify-between h-14 px-4">
-          <h1 className="text-base font-semibold text-[var(--foreground)]">Groups</h1>
+          <h1 className="text-lg font-bold text-[var(--foreground)] tracking-tight">Groups</h1>
           <Link href="/groups/new" className="p-1">
             <svg className="w-6 h-6 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -45,7 +45,7 @@ export default function GroupsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-[var(--foreground)] truncate">{trip.name}</span>
-                      <span className="text-sm font-bold text-[var(--foreground)]">₹{totalSpent.toLocaleString()}</span>
+                      <span className="text-sm font-bold text-[var(--foreground)] tabular-nums">₹{totalSpent.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
                       <div className="flex items-center gap-1.5">

@@ -14,7 +14,7 @@ export default function ActivityPage() {
     <div className="min-h-screen bg-[var(--background)]">
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[var(--border-color)]">
         <div className="flex items-center h-14 px-4">
-          <h1 className="text-base font-semibold text-[var(--foreground)]">Activity</h1>
+          <h1 className="text-lg font-bold text-[var(--foreground)] tracking-tight">Activity</h1>
         </div>
       </header>
 

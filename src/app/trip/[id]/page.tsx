@@ -27,7 +27,7 @@ export default function TripPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
-          <h1 className="text-base font-semibold text-[var(--foreground)]">{trip.name}</h1>
+          <h1 className="text-lg font-bold text-[var(--foreground)] tracking-tight">{trip.name}</h1>
         </div>
 
         {/* Tab bar — group-level */}

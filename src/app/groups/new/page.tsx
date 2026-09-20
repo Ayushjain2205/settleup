@@ -95,7 +95,7 @@ export default function GroupWizard() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="text-base font-semibold text-[var(--foreground)]">New Group</span>
+          <span className="text-lg font-bold text-[var(--foreground)] tracking-tight">New Group</span>
         </div>
         <div className="px-4 pb-3">
           <StepIndicator steps={STEPS} currentStep={currentStep} />

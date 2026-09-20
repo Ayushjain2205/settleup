@@ -10,8 +10,7 @@
   --color-muted: var(--muted);
   --color-success: var(--success);
   --color-error: var(--error);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
 }
 
 :root {
@@ -24,8 +23,6 @@
   --muted: #737373;
   --success: #16a34a;
   --error: #dc2626;
-  --nav-height: 56px;
-  --bottom-nav-height: 64px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -34,10 +31,12 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
+  letter-spacing: -0.011em;
 }
 
 ::selection {
@@ -55,9 +54,6 @@ body {
   .card-lift { transform: none !important; box-shadow: none !important; }
 }
 
-/* Bottom nav safe area */
-.pb-nav { padding-bottom: calc(var(--bottom-nav-height) + var(--safe-bottom)); }
-
 /* Dense list item */
 .list-item {
   display: flex;
@@ -70,7 +66,7 @@ body {
 /* FAB */
 .fab {
   position: fixed;
-  bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 16px);
+  bottom: calc(64px + var(--safe-bottom) + 16px);
   right: 16px;
   width: 56px;
   height: 56px;
@@ -85,19 +81,6 @@ body {
   transition: transform 0.15s ease;
 }
 .fab:active { transform: scale(0.92); }
-
-/* Flat card — no shadow, no hover lift */
-.flat-card {
-  background: var(--surface);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-}
-
-/* Section divider */
-.divider {
-  height: 1px;
-  background: var(--border-color);
-}
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 0; height: 0; }

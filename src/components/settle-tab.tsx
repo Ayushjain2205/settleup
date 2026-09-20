@@ -61,7 +61,7 @@ export function SettleTab({ settlements, members }: SettleTabProps) {
 
               {/* To avatar + amount */}
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-sm font-semibold text-[var(--foreground)]">₹{s.amount.toLocaleString()}</span>
+                <span className="text-sm font-semibold text-[var(--foreground)] tabular-nums">₹{s.amount.toLocaleString()}</span>
                 <div className="w-9 h-9 rounded-full bg-[var(--success)]/10 flex items-center justify-center text-xs font-bold text-[var(--success)]">
                   {to.avatar}
                 </div>

@@ -46,7 +46,7 @@ export function BalancesPanel({ balances, members }: BalancesPanelProps) {
                   />
                 </div>
               </div>
-              <div className={`text-sm font-semibold flex-shrink-0 ${isPositive ? "text-[var(--success)]" : "text-[var(--error)]"}`}>
+              <div className={`text-sm font-semibold flex-shrink-0 tabular-nums ${isPositive ? "text-[var(--success)]" : "text-[var(--error)]"}`}>
                 {isPositive ? "+" : ""}₹{balance.amount.toLocaleString()}
               </div>
             </div>

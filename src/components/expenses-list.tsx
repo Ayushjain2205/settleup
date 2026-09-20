@@ -56,10 +56,10 @@ export function ExpensesList({ expenses, members }: ExpensesListProps) {
           <div key={date}>
             {/* Date header — minimal */}
             <div className="flex items-center justify-between px-4 py-2 bg-[var(--background)]">
-              <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wide">
+              <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">
                 {new Date(date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
               </span>
-              <span className="text-[11px] font-medium text-[var(--muted)]">₹{dayTotal.toLocaleString()}</span>
+              <span className="text-[11px] font-semibold text-[var(--muted)] tabular-nums">₹{dayTotal.toLocaleString()}</span>
             </div>
 
             {/* Expense items — dense list */}
@@ -78,7 +78,7 @@ export function ExpensesList({ expenses, members }: ExpensesListProps) {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-semibold text-[var(--foreground)]">₹{expense.baseAmount.toLocaleString()}</div>
+                    <div className="text-sm font-semibold text-[var(--foreground)] tabular-nums">₹{expense.baseAmount.toLocaleString()}</div>
                   </div>
                 </div>
               ))}

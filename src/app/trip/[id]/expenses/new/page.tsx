@@ -71,7 +71,7 @@ export default function AddExpensePage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <span className="text-base font-semibold text-[var(--foreground)]">Add Expense</span>
+          <span className="text-lg font-bold text-[var(--foreground)] tracking-tight">Add Expense</span>
         </div>
       </header>
 
