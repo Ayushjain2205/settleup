@@ -1,6 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) redirect("/");
+
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <nav className="flex items-center justify-between px-5 py-4">
@@ -11,10 +17,10 @@ export default function LandingPage() {
           <span className="font-semibold text-base text-[var(--foreground)]">SettleUp</span>
         </div>
         <Link
-          href="/"
+          href="/login"
           className="px-4 py-2 bg-[var(--foreground)] text-[var(--background)] rounded-lg text-sm font-medium active:opacity-80 transition-opacity"
         >
-          Open App
+          Sign in
         </Link>
       </nav>
 
@@ -26,41 +32,18 @@ export default function LandingPage() {
             not friendships
           </h1>
           <p className="text-sm text-[var(--muted)] leading-relaxed mb-8">
-            Track group travel expenses with AI receipt scanning, dual-currency ledgers,
-            and smart debt simplification. Free forever.
+            Track group travel expenses with dual-currency ledgers and smart
+            debt simplification. Free forever.
           </p>
 
-          <div className="flex gap-3">
-            <Link
-              href="/"
-              className="flex-1 py-3 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold text-center active:opacity-80 transition-opacity"
-            >
-              Get started
-            </Link>
-            <Link
-              href="/trip/malaysia-2026"
-              className="flex-1 py-3 bg-white border border-[var(--border-color)] text-[var(--foreground)] rounded-xl text-sm font-medium text-center active:opacity-80 transition-opacity"
-            >
-              See demo
-            </Link>
-          </div>
+          <Link
+            href="/login"
+            className="block w-full py-3 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold text-center active:opacity-80 transition-opacity"
+          >
+            Get started
+          </Link>
 
           <div className="mt-12 space-y-0 divide-y divide-[var(--border-color)] border-y border-[var(--border-color)]">
-            <div className="py-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-[var(--foreground)]">AI Receipt Scan</div>
-                  <div className="text-xs text-[var(--muted)]">Snap a photo, we handle the rest</div>
-                </div>
-              </div>
-            </div>
-
             <div className="py-4">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center flex-shrink-0">
@@ -84,7 +67,21 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <div className="text-sm font-medium text-[var(--foreground)]">Smart Settle</div>
-                  <div className="text-xs text-[var(--muted)]">Minimize transfers, one-tap UPI</div>
+                  <div className="text-xs text-[var(--muted)]">Fewer transfers, settled fairly</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-[var(--foreground)]">Flexible Splits</div>
+                  <div className="text-xs text-[var(--muted)]">Equal, exact, percentage, or by item</div>
                 </div>
               </div>
             </div>
@@ -100,8 +97,8 @@ export default function LandingPage() {
               <div className="text-[10px] text-[var(--muted)] uppercase tracking-wider">To log</div>
             </div>
             <div>
-              <div className="text-lg font-bold text-[var(--foreground)]">1-tap</div>
-              <div className="text-[10px] text-[var(--muted)] uppercase tracking-wider">UPI settle</div>
+              <div className="text-lg font-bold text-[var(--foreground)]">∞</div>
+              <div className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Groups</div>
             </div>
           </div>
         </div>
