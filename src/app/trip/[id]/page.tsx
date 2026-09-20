@@ -45,7 +45,7 @@ export default function TripPage() {
 
         {/* Tab Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 animate-fade-in" key={activeTab}>
             {activeTab === "expenses" && (
               <ExpensesList
                 expenses={trip.expenses}
@@ -70,7 +70,7 @@ export default function TripPage() {
           </div>
 
           {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-4">
+          <div className="lg:col-span-1 space-y-4 stagger-children">
             <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-5">
               <h3 className="font-semibold text-[var(--foreground)] mb-4">Trip Summary</h3>
               <dl className="space-y-3">

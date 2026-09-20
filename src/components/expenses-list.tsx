@@ -69,11 +69,11 @@ export function ExpensesList({ expenses, members }: ExpensesListProps) {
               </span>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 stagger-children">
               {dayExpenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 hover:shadow-sm transition-shadow cursor-pointer"
+                  className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 hover:shadow-sm transition-shadow cursor-pointer card-hover"
                 >
                   <div className="flex items-start gap-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${CATEGORY_COLORS[expense.category]}`}>

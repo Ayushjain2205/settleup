@@ -71,7 +71,7 @@ export default function GroupWizard() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center space-y-6 animate-fade-in">
-          <div className="w-20 h-20 bg-[var(--success)] rounded-full flex items-center justify-center mx-auto">
+          <div className="w-20 h-20 bg-[var(--success)] rounded-full flex items-center justify-center mx-auto animate-scale-in">
             <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
@@ -82,7 +82,7 @@ export default function GroupWizard() {
           </div>
           <button
             onClick={() => router.push("/")}
-            className="px-8 py-3 bg-[var(--primary)] text-white rounded-xl font-semibold hover:bg-[var(--primary-dark)] transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="px-8 py-3 bg-[var(--primary)] text-white rounded-xl font-semibold hover:bg-[var(--primary-dark)] transition-all duration-200 shadow-lg hover:shadow-xl btn-press"
           >
             Go to Dashboard
           </button>
@@ -107,15 +107,17 @@ export default function GroupWizard() {
           <StepIndicator steps={STEPS} currentStep={currentStep} />
 
           <div className="mt-8 bg-[var(--surface)] rounded-2xl shadow-sm border border-[var(--border)] p-8">
-            {currentStep === 1 && (
-              <StepBasics formData={formData} updateFormData={updateFormData} />
-            )}
-            {currentStep === 2 && (
-              <StepCurrency formData={formData} updateFormData={updateFormData} />
-            )}
-            {currentStep === 3 && (
-              <StepDebts formData={formData} updateFormData={updateFormData} />
-            )}
+            <div key={currentStep} className="animate-fade-in">
+              {currentStep === 1 && (
+                <StepBasics formData={formData} updateFormData={updateFormData} />
+              )}
+              {currentStep === 2 && (
+                <StepCurrency formData={formData} updateFormData={updateFormData} />
+              )}
+              {currentStep === 3 && (
+                <StepDebts formData={formData} updateFormData={updateFormData} />
+              )}
+            </div>
           </div>
 
           <div className="flex justify-between mt-6">
