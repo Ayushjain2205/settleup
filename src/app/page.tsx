@@ -1,114 +1,93 @@
 import Link from "next/link";
+import { MOCK_TRIPS } from "@/lib/mock-data";
 
-export default function Home() {
+export default function GroupsPage() {
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      {/* Nav — minimal */}
-      <nav className="flex items-center justify-between px-5 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[var(--primary)] flex items-center justify-center">
-            <span className="text-white font-bold text-sm">S</span>
-          </div>
-          <span className="font-semibold text-base text-[var(--foreground)]">SettleUp</span>
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[var(--border-color)]">
+        <div className="flex items-center justify-between h-14 px-4">
+          <h1 className="text-base font-semibold text-[var(--foreground)]">Groups</h1>
+          <Link href="/groups/new" className="p-1">
+            <svg className="w-6 h-6 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+          </Link>
         </div>
-        <Link
-          href="/groups/new"
-          className="px-4 py-2 bg-[var(--foreground)] text-[var(--background)] rounded-lg text-sm font-medium active:opacity-80 transition-opacity"
-        >
-          Get started
-        </Link>
-      </nav>
+      </header>
 
-      {/* Hero — direct, no decoration */}
-      <main className="px-5 pt-12 pb-20">
-        <div className="max-w-lg mx-auto">
-          <h1 className="text-3xl font-bold text-[var(--foreground)] leading-tight mb-3">
-            Split expenses,
-            <br />
-            not friendships
-          </h1>
-          <p className="text-sm text-[var(--muted)] leading-relaxed mb-8">
-            Track group travel expenses with AI receipt scanning, dual-currency ledgers,
-            and smart debt simplification. Free forever.
-          </p>
-
-          <div className="flex gap-3">
-            <Link
-              href="/groups/new"
-              className="flex-1 py-3 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold text-center active:opacity-80 transition-opacity"
-            >
-              Create a group
-            </Link>
-            <Link
-              href="/trip/malaysia-2026"
-              className="flex-1 py-3 bg-white border border-[var(--border-color)] text-[var(--foreground)] rounded-xl text-sm font-medium text-center active:opacity-80 transition-opacity"
-            >
-              See demo
-            </Link>
-          </div>
-
-          {/* Features — flat list, no cards */}
-          <div className="mt-12 space-y-0 divide-y divide-[var(--border-color)] border-y border-[var(--border-color)]">
-            <div className="py-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-[var(--foreground)]">AI Receipt Scan</div>
-                  <div className="text-xs text-[var(--muted)]">Snap a photo, we handle the rest</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="py-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-[var(--foreground)]">Dual Currency</div>
-                  <div className="text-xs text-[var(--muted)]">Spend in MYR, settle in INR</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="py-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[var(--success)]/10 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-[var(--success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-[var(--foreground)]">Smart Settle</div>
-                  <div className="text-xs text-[var(--muted)]">Minimize transfers, one-tap UPI</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats — inline, no decoration */}
-          <div className="mt-8 flex items-center justify-between">
-            <div>
-              <div className="text-lg font-bold text-[var(--foreground)]">0%</div>
-              <div className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Paywall</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-[var(--foreground)]">&lt;30s</div>
-              <div className="text-[10px] text-[var(--muted)] uppercase tracking-wider">To log</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-[var(--foreground)]">1-tap</div>
-              <div className="text-[10px] text-[var(--muted)] uppercase tracking-wider">UPI settle</div>
-            </div>
-          </div>
+      <main className="pb-20">
+        {/* Active groups */}
+        <div className="px-4 pt-4 pb-2">
+          <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Active</span>
         </div>
+
+        <div className="divide-y divide-[var(--border-color)]">
+          {MOCK_TRIPS.map((trip) => {
+            const totalSpent = trip.expenses.reduce((sum, e) => sum + e.baseAmount, 0);
+            const lastExpense = trip.expenses.sort((a, b) => b.date.localeCompare(a.date))[0];
+
+            return (
+              <Link
+                key={trip.id}
+                href={`/trip/${trip.id}`}
+                className="block px-4 py-3 bg-white active:bg-[var(--background)] transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  {/* Group icon */}
+                  <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                    </svg>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-[var(--foreground)] truncate">{trip.name}</span>
+                      <span className="text-sm font-bold text-[var(--foreground)]">₹{totalSpent.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <div className="flex items-center gap-1.5">
+                        {/* Member avatars */}
+                        <div className="flex -space-x-1.5">
+                          {trip.members.slice(0, 3).map((m) => (
+                            <div key={m.id} className="w-4 h-4 rounded-full bg-[var(--foreground)] border border-white flex items-center justify-center text-[6px] font-bold text-white">
+                              {m.avatar}
+                            </div>
+                          ))}
+                        </div>
+                        <span className="text-[11px] text-[var(--muted)]">
+                          {trip.members.length} members
+                        </span>
+                      </div>
+                      {lastExpense && (
+                        <span className="text-[10px] text-[var(--muted)]">
+                          {new Date(lastExpense.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Empty state if no groups */}
+        {MOCK_TRIPS.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-24 px-6">
+            <div className="w-12 h-12 rounded-full bg-[var(--primary)]/10 flex items-center justify-center mb-3">
+              <svg className="w-6 h-6 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium text-[var(--foreground)]">No groups yet</p>
+            <p className="text-xs text-[var(--muted)] mt-1 mb-4">Create your first group to start tracking</p>
+            <Link href="/groups/new" className="px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-semibold">
+              Create Group
+            </Link>
+          </div>
+        )}
       </main>
     </div>
   );

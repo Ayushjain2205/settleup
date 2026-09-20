@@ -83,3 +83,36 @@ export const MOCK_TRIP: Trip = {
     { from: "u3", to: "u1", amount: 360, currency: "INR" },
   ],
 };
+
+export const MOCK_TRIPS: Trip[] = [
+  MOCK_TRIP,
+  {
+    id: "goa-2025",
+    name: "Goa New Year 2025",
+    tripType: "domestic",
+    baseCurrency: "INR",
+    spendCurrency: "INR",
+    fxMode: "fixed",
+    fixedFxRate: 1,
+    simplifyDebts: true,
+    members: [
+      { id: "u1", name: "You", avatar: "Y" },
+      { id: "u5", name: "Vikram", avatar: "V" },
+      { id: "u6", name: "Meera", avatar: "M" },
+    ],
+    expenses: [
+      { id: "g1", title: "Beach shack dinner", amount: 2400, currency: "INR", baseAmount: 2400, baseCurrency: "INR", paidBy: "u1", splitAmong: ["u1", "u5", "u6"], splitType: "equal", date: "2025-01-01", category: "food" },
+      { id: "g2", title: "Scooter rental", amount: 800, currency: "INR", baseAmount: 800, baseCurrency: "INR", paidBy: "u5", splitAmong: ["u1", "u5", "u6"], splitType: "equal", date: "2025-01-01", category: "transport" },
+      { id: "g3", title: "Hotel (3 nights)", amount: 9000, currency: "INR", baseAmount: 9000, baseCurrency: "INR", paidBy: "u6", splitAmong: ["u1", "u5", "u6"], splitType: "equal", date: "2025-01-01", category: "accommodation" },
+    ],
+    balances: [
+      { memberId: "u1", amount: 2600, currency: "INR" },
+      { memberId: "u5", amount: -200, currency: "INR" },
+      { memberId: "u6", amount: -2400, currency: "INR" },
+    ],
+    settlements: [
+      { from: "u5", to: "u1", amount: 200, currency: "INR" },
+      { from: "u6", to: "u1", amount: 2400, currency: "INR" },
+    ],
+  },
+];
