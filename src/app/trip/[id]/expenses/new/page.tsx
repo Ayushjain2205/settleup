@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MOCK_TRIP } from "@/lib/mock-data";
 import { PayerPicker } from "@/components/payer-picker";
@@ -8,9 +8,12 @@ import { SplitOptions } from "@/components/split-options";
 
 type SplitMode = "equal" | "exact" | "percent" | "itemized";
 
+const getSymbol = (currency: string) => currency === "INR" ? "₹" : currency === "MYR" ? "RM" : "$";
+
 export default function AddExpensePage() {
   const router = useRouter();
   const trip = MOCK_TRIP;
+  const dateRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
@@ -22,9 +25,15 @@ export default function AddExpensePage() {
   const [showPayerPicker, setShowPayerPicker] = useState(false);
   const [showSplitOptions, setShowSplitOptions] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [useBaseCurrency, setUseBaseCurrency] = useState(false);
 
   const amountNum = parseFloat(amount) || 0;
-  const symbol = trip.spendCurrency === "INR" ? "₹" : trip.spendCurrency === "MYR" ? "RM" : "$";
+  const currency = useBaseCurrency ? trip.baseCurrency : trip.spendCurrency;
+  const symbol = getSymbol(currency);
+
+  const isToday = expenseDate === new Date().toISOString().split("T")[0];
+  const dateLabel = isToday ? "Today" : new Date(expenseDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
   const paidByName = trip.members.find((m) => m.id === paidBy)?.name || "you";
   const splitLabel = splitMode === "equal" ? "equally" : splitMode === "exact" ? "by amount" : splitMode === "percent" ? "by %" : "by items";
@@ -101,9 +110,12 @@ export default function AddExpensePage() {
 
         {/* Amount */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl border border-[var(--border-color)] flex items-center justify-center flex-shrink-0">
+          <button
+            onClick={() => setUseBaseCurrency((p) => !p)}
+            className="w-10 h-10 rounded-xl border border-[var(--border-color)] flex items-center justify-center flex-shrink-0 active:bg-[var(--background)] transition-colors"
+          >
             <span className="text-lg font-semibold text-[var(--muted)]">{symbol}</span>
-          </div>
+          </button>
           <input
             type="number"
             value={amount}
@@ -136,12 +148,19 @@ export default function AddExpensePage() {
 
         {/* Bottom toolbar */}
         <div className="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
-          <button className="flex items-center gap-2 text-sm text-[var(--muted)]">
+          <button onClick={() => dateRef.current?.showPicker()} className="flex items-center gap-2 text-sm text-[var(--muted)]">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
             </svg>
-            <span className="font-medium">Today</span>
+            <span className="font-medium">{dateLabel}</span>
           </button>
+          <input
+            ref={dateRef}
+            type="date"
+            value={expenseDate}
+            onChange={(e) => setExpenseDate(e.target.value)}
+            className="sr-only"
+          />
           <button className="flex items-center gap-2 text-sm text-[var(--muted)]">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
