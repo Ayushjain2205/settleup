@@ -1,69 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { CATEGORIES } from "@/lib/categories";
-import type { Balance, Expense, Member, Settlement } from "@/lib/mock-data";
+import { computeBalances, simplifyDebts } from "@/lib/settlements";
+import type { Expense, Member } from "@/lib/mock-data";
 import { TripView } from "./trip-view";
 
 function broadOf(categoryId: string): Expense["category"] {
   return CATEGORIES.find((c) => c.id === categoryId)?.broad || "other";
-}
-
-function computeBalances(
-  members: Member[],
-  expenses: { paidBy: string; baseAmount: number }[],
-  splits: { expenseId: string; memberId: string; amountOwed: number }[],
-  expenseById: Map<string, { paidBy: string; baseAmount: number }>,
-  currency: string
-): Balance[] {
-  const paid = new Map<string, number>();
-  const owed = new Map<string, number>();
-  for (const m of members) {
-    paid.set(m.id, 0);
-    owed.set(m.id, 0);
-  }
-  for (const e of expenses) {
-    paid.set(e.paidBy, (paid.get(e.paidBy) || 0) + e.baseAmount);
-  }
-  for (const s of splits) {
-    if (!expenseById.has(s.expenseId)) continue;
-    owed.set(s.memberId, (owed.get(s.memberId) || 0) + s.amountOwed);
-  }
-  return members.map((m) => ({
-    memberId: m.id,
-    amount: Math.round(((paid.get(m.id) || 0) - (owed.get(m.id) || 0)) * 100) / 100,
-    currency,
-  }));
-}
-
-function simplifyDebts(balances: Balance[], currency: string): Settlement[] {
-  const creditors = balances
-    .filter((b) => b.amount > 0.009)
-    .map((b) => ({ ...b }))
-    .sort((a, b) => b.amount - a.amount);
-  const debtors = balances
-    .filter((b) => b.amount < -0.009)
-    .map((b) => ({ ...b }))
-    .sort((a, b) => a.amount - b.amount);
-
-  const result: Settlement[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < creditors.length && j < debtors.length) {
-    const c = creditors[i];
-    const d = debtors[j];
-    const payment = Math.min(c.amount, -d.amount);
-    if (payment < 0.01) break;
-    result.push({
-      from: d.memberId,
-      to: c.memberId,
-      amount: Math.round(payment * 100) / 100,
-      currency,
-    });
-    c.amount -= payment;
-    d.amount += payment;
-    if (c.amount < 0.01) i++;
-    if (-d.amount < 0.01) j++;
-  }
-  return result;
 }
 
 export default async function TripPage({ params }: { params: Promise<{ id: string }> }) {
@@ -135,19 +77,14 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
   }));
 
   const splits = (splitRows || []).map((s) => ({
-    expenseId: s.expense_id,
     memberId: s.member_id,
     amountOwed: Number(s.amount_owed),
   }));
-  const expenseById = new Map(
-    expenses.map((e) => [e.id, { paidBy: e.paidBy, baseAmount: e.baseAmount }] as const)
-  );
 
   const balances = computeBalances(
-    members,
+    members.map((m) => m.id),
     expenses.map((e) => ({ paidBy: e.paidBy, baseAmount: e.baseAmount })),
     splits,
-    expenseById,
     group.base_currency
   );
   const settlements = group.simplify_debts ? simplifyDebts(balances, group.base_currency) : [];

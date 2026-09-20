@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { computeSplitOwes } from "@/lib/splits";
 import { PayerPicker } from "@/components/payer-picker";
 import { SplitOptions, type SplitItem } from "@/components/split-options";
 import { CategoryPicker } from "@/components/category-picker";
@@ -88,36 +89,16 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
           : Math.abs(totalItemized - amountNum) < 0.01 && items.every((i) => i.name.trim().length > 0));
 
   // Per-member owed amounts in base currency
-  const computeSplits = (): { memberId: string; amountOwed: number }[] => {
-    if (splitMode === "equal") {
-      const share = baseAmount / selectedMembers.length;
-      return selectedMembers.map((id) => ({ memberId: id, amountOwed: Math.round(share * 100) / 100 }));
-    }
-    if (splitMode === "exact") {
-      return Object.entries(exactAmounts)
-        .filter(([, v]) => (parseFloat(v) || 0) > 0)
-        .map(([id, v]) => ({ memberId: id, amountOwed: Math.round(toBase(parseFloat(v)) * 100) / 100 }));
-    }
-    if (splitMode === "percent") {
-      return Object.entries(percentages)
-        .filter(([, v]) => (parseFloat(v) || 0) > 0)
-        .map(([id, v]) => ({ memberId: id, amountOwed: Math.round(baseAmount * (parseFloat(v) / 100) * 100) / 100 }));
-    }
-    // itemized: collapse items into per-member totals
-    const totals = new Map<string, number>();
-    for (const item of items) {
-      const itemBase = toBase(parseFloat(item.amount) || 0);
-      if (item.splitAmong.length === 0) continue;
-      const share = itemBase / item.splitAmong.length;
-      for (const id of item.splitAmong) {
-        totals.set(id, (totals.get(id) || 0) + share);
-      }
-    }
-    return [...totals.entries()].map(([memberId, amountOwed]) => ({
-      memberId,
-      amountOwed: Math.round(amountOwed * 100) / 100,
-    }));
-  };
+  const computeSplits = () =>
+    computeSplitOwes({
+      mode: splitMode,
+      baseAmount,
+      selected: selectedMembers,
+      exactAmounts,
+      percentages,
+      items,
+      toBase,
+    });
 
   const handleSubmit = async () => {
     if (!canSubmit || isSubmitting) return;
