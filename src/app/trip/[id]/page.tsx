@@ -1,71 +1,165 @@
-"use client";
+import { createClient } from "@/lib/supabase/server";
+import { CATEGORIES } from "@/lib/categories";
+import type { Balance, Expense, Member, Settlement } from "@/lib/mock-data";
+import { TripView } from "./trip-view";
 
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { MOCK_TRIP, type Trip } from "@/lib/mock-data";
-import { BottomNav } from "@/components/bottom-nav";
-import { ExpensesList } from "@/components/expenses-list";
-import { BalancesPanel } from "@/components/balances-panel";
-import { SettleTab } from "@/components/settle-tab";
+function broadOf(categoryId: string): Expense["category"] {
+  return CATEGORIES.find((c) => c.id === categoryId)?.broad || "other";
+}
 
-type Tab = "expenses" | "balances" | "settle";
+function computeBalances(
+  members: Member[],
+  expenses: { paidBy: string; baseAmount: number }[],
+  splits: { expenseId: string; memberId: string; amountOwed: number }[],
+  expenseById: Map<string, { paidBy: string; baseAmount: number }>,
+  currency: string
+): Balance[] {
+  const paid = new Map<string, number>();
+  const owed = new Map<string, number>();
+  for (const m of members) {
+    paid.set(m.id, 0);
+    owed.set(m.id, 0);
+  }
+  for (const e of expenses) {
+    paid.set(e.paidBy, (paid.get(e.paidBy) || 0) + e.baseAmount);
+  }
+  for (const s of splits) {
+    if (!expenseById.has(s.expenseId)) continue;
+    owed.set(s.memberId, (owed.get(s.memberId) || 0) + s.amountOwed);
+  }
+  return members.map((m) => ({
+    memberId: m.id,
+    amount: Math.round(((paid.get(m.id) || 0) - (owed.get(m.id) || 0)) * 100) / 100,
+    currency,
+  }));
+}
 
-export default function TripPage() {
-  const trip: Trip = MOCK_TRIP;
-  const searchParams = useSearchParams();
-  const initialTab = (searchParams.get("tab") as Tab) || "expenses";
-  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+function simplifyDebts(balances: Balance[], currency: string): Settlement[] {
+  const creditors = balances
+    .filter((b) => b.amount > 0.009)
+    .map((b) => ({ ...b }))
+    .sort((a, b) => b.amount - a.amount);
+  const debtors = balances
+    .filter((b) => b.amount < -0.009)
+    .map((b) => ({ ...b }))
+    .sort((a, b) => a.amount - b.amount);
+
+  const result: Settlement[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < creditors.length && j < debtors.length) {
+    const c = creditors[i];
+    const d = debtors[j];
+    const payment = Math.min(c.amount, -d.amount);
+    if (payment < 0.01) break;
+    result.push({
+      from: d.memberId,
+      to: c.memberId,
+      amount: Math.round(payment * 100) / 100,
+      currency,
+    });
+    c.amount -= payment;
+    d.amount += payment;
+    if (c.amount < 0.01) i++;
+    if (-d.amount < 0.01) j++;
+  }
+  return result;
+}
+
+export default async function TripPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex flex-col items-center justify-center px-6">
+        <p className="text-sm font-medium text-[var(--foreground)]">Sign in to view this group</p>
+        <a href="/login" className="mt-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-semibold">
+          Sign in
+        </a>
+      </div>
+    );
+  }
+
+  const { data: group } = await supabase
+    .from("groups")
+    .select("id, name, base_currency, spend_currency, fx_mode, fixed_fx_rate, simplify_debts")
+    .eq("id", id)
+    .single();
+
+  if (!group) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex flex-col items-center justify-center px-6">
+        <p className="text-sm font-medium text-[var(--foreground)]">Group not found</p>
+        <p className="text-xs text-[var(--muted)] mt-1">It may have been deleted or you don&apos;t have access</p>
+        <a href="/" className="mt-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-semibold">
+          Back to groups
+        </a>
+      </div>
+    );
+  }
+
+  const [{ data: memberRows }, { data: expenseRows }, { data: splitRows }] = await Promise.all([
+    supabase.from("group_members").select("id, name, avatar, upi_id").eq("group_id", id),
+    supabase
+      .from("expenses")
+      .select("id, title, amount, currency, base_amount, category_id, paid_by, split_mode, expense_date")
+      .eq("group_id", id)
+      .order("expense_date", { ascending: false }),
+    supabase
+      .from("expense_splits")
+      .select("expense_id, member_id, amount_owed")
+      .in("expense_id", (await supabase.from("expenses").select("id").eq("group_id", id)).data?.map((e) => e.id) || ["00000000-0000-0000-0000-000000000000"]),
+  ]);
+
+  const members: Member[] = (memberRows || []).map((m) => ({
+    id: m.id,
+    name: m.name,
+    avatar: m.avatar,
+    upiId: m.upi_id || undefined,
+  }));
+
+  const expenses: Expense[] = (expenseRows || []).map((e) => ({
+    id: e.id,
+    title: e.title,
+    amount: Number(e.amount),
+    currency: e.currency,
+    baseAmount: Number(e.base_amount),
+    baseCurrency: group.base_currency,
+    paidBy: e.paid_by,
+    splitAmong: (splitRows || []).filter((s) => s.expense_id === e.id).map((s) => s.member_id),
+    splitType: e.split_mode === "percent" ? "exact" : (e.split_mode as Expense["splitType"]),
+    date: e.expense_date,
+    category: broadOf(e.category_id),
+  }));
+
+  const splits = (splitRows || []).map((s) => ({
+    expenseId: s.expense_id,
+    memberId: s.member_id,
+    amountOwed: Number(s.amount_owed),
+  }));
+  const expenseById = new Map(
+    expenses.map((e) => [e.id, { paidBy: e.paidBy, baseAmount: e.baseAmount }] as const)
+  );
+
+  const balances = computeBalances(
+    members,
+    expenses.map((e) => ({ paidBy: e.paidBy, baseAmount: e.baseAmount })),
+    splits,
+    expenseById,
+    group.base_currency
+  );
+  const settlements = group.simplify_debts ? simplifyDebts(balances, group.base_currency) : [];
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[var(--border-color)]">
-        <div className="flex items-center h-14 px-4">
-          <Link href="/" className="p-1 -ml-1 mr-3">
-            <svg className="w-5 h-5 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <h1 className="text-lg font-bold text-[var(--foreground)] tracking-tight">{trip.name}</h1>
-        </div>
-
-        {/* Tab bar — group-level */}
-        <div className="flex px-4 gap-0">
-          {(["expenses", "balances", "settle"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
-                activeTab === tab
-                  ? "border-[var(--primary)] text-[var(--primary)]"
-                  : "border-transparent text-[var(--muted)]"
-              }`}
-            >
-              {tab === "expenses" && "Expenses"}
-              {tab === "balances" && "Balances"}
-              {tab === "settle" && "Settle"}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="pb-20">
-        {activeTab === "expenses" && <ExpensesList expenses={trip.expenses} members={trip.members} />}
-        {activeTab === "balances" && <BalancesPanel balances={trip.balances} members={trip.members} />}
-        {activeTab === "settle" && <SettleTab settlements={trip.settlements} members={trip.members} />}
-      </main>
-
-      {/* FAB — Add Expense */}
-      <Link href={`/trip/${trip.id}/expenses/new`} className="fab" aria-label="Add expense" style={{ bottom: "calc(64px + var(--safe-bottom) + 16px)" }}>
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-      </Link>
-
-      {/* App-level bottom nav */}
-      <BottomNav />
-    </div>
+    <TripView
+      tripId={group.id}
+      tripName={group.name}
+      members={members}
+      expenses={expenses}
+      balances={balances}
+      settlements={settlements}
+    />
   );
 }
