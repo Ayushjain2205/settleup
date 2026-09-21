@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import type { Member } from "@/lib/mock-data";
 import { TripShell } from "./trip-view";
 import { BalancesPane, ExpensesPane, SettlePane } from "./panes";
 
@@ -7,13 +8,14 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
   const supabase = await createClient();
 
   // Shell paints after this single wave — tab data streams in behind it.
-  const [{ data: { user } }, { data: group }] = await Promise.all([
+  const [{ data: { user } }, { data: group }, { data: memberRows }] = await Promise.all([
     supabase.auth.getUser(),
     supabase
       .from("groups")
       .select("id, name, base_currency, simplify_debts")
       .eq("id", id)
       .single(),
+    supabase.from("group_members").select("id, name, avatar, upi_id").eq("group_id", id),
   ]);
 
   if (!user) {
@@ -49,13 +51,20 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     );
   }
 
+  const members: Member[] = (memberRows || []).map((m) => ({
+    id: m.id,
+    name: m.name,
+    avatar: m.avatar,
+    upiId: m.upi_id || undefined,
+  }));
+
   return (
     <TripShell
       tripId={group.id}
       tripName={group.name}
-      expensesPane={<ExpensesPane groupId={group.id} baseCurrency={group.base_currency} />}
-      balancesPane={<BalancesPane groupId={group.id} baseCurrency={group.base_currency} />}
-      settlePane={<SettlePane groupId={group.id} baseCurrency={group.base_currency} simplify={group.simplify_debts} />}
+      expensesPane={<ExpensesPane groupId={group.id} baseCurrency={group.base_currency} members={members} />}
+      balancesPane={<BalancesPane groupId={group.id} baseCurrency={group.base_currency} members={members} />}
+      settlePane={<SettlePane groupId={group.id} baseCurrency={group.base_currency} members={members} simplify={group.simplify_debts} />}
     />
   );
 }

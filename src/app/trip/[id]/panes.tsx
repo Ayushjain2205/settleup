@@ -27,11 +27,6 @@ function ListSkeleton() {
   );
 }
 
-async function getMembers(supabase: Awaited<ReturnType<typeof createClient>>, groupId: string): Promise<Member[]> {
-  const { data } = await supabase.from("group_members").select("id, name, avatar, upi_id").eq("group_id", groupId);
-  return (data || []).map((m) => ({ id: m.id, name: m.name, avatar: m.avatar, upiId: m.upi_id || undefined }));
-}
-
 async function getExpenses(supabase: Awaited<ReturnType<typeof createClient>>, groupId: string, baseCurrency: string): Promise<Expense[]> {
   const [{ data: expenseRows }, { data: splitRows }] = await Promise.all([
     supabase
@@ -59,12 +54,9 @@ async function getExpenses(supabase: Awaited<ReturnType<typeof createClient>>, g
   }));
 }
 
-export async function ExpensesPane({ groupId, baseCurrency }: { groupId: string; baseCurrency: string }) {
+export async function ExpensesPane({ groupId, baseCurrency, members }: { groupId: string; baseCurrency: string; members: Member[] }) {
   const supabase = await createClient();
-  const [members, expenses] = await Promise.all([
-    getMembers(supabase, groupId),
-    getExpenses(supabase, groupId, baseCurrency),
-  ]);
+  const expenses = await getExpenses(supabase, groupId, baseCurrency);
   const { data: splitRows } = await supabase
     .from("expense_splits")
     .select("expense_id, member_id, amount_owed, expenses!inner(group_id)")
@@ -76,12 +68,9 @@ export async function ExpensesPane({ groupId, baseCurrency }: { groupId: string;
   return <ExpensesList expenses={expenses} members={members} splitDetails={splitDetails} groupId={groupId} />;
 }
 
-export async function BalancesPane({ groupId, baseCurrency }: { groupId: string; baseCurrency: string }) {
+export async function BalancesPane({ groupId, baseCurrency, members }: { groupId: string; baseCurrency: string; members: Member[] }) {
   const supabase = await createClient();
-  const [members, expenses] = await Promise.all([
-    getMembers(supabase, groupId),
-    getExpenses(supabase, groupId, baseCurrency),
-  ]);
+  const expenses = await getExpenses(supabase, groupId, baseCurrency);
   const { data: splitRows } = await supabase
     .from("expense_splits")
     .select("expense_id, member_id, amount_owed, expenses!inner(group_id)")
@@ -95,12 +84,9 @@ export async function BalancesPane({ groupId, baseCurrency }: { groupId: string;
   return <BalancesPanel balances={balances} members={members} />;
 }
 
-export async function SettlePane({ groupId, baseCurrency, simplify }: { groupId: string; baseCurrency: string; simplify: boolean }) {
+export async function SettlePane({ groupId, baseCurrency, members, simplify }: { groupId: string; baseCurrency: string; members: Member[]; simplify: boolean }) {
   const supabase = await createClient();
-  const [members, expenses] = await Promise.all([
-    getMembers(supabase, groupId),
-    getExpenses(supabase, groupId, baseCurrency),
-  ]);
+  const expenses = await getExpenses(supabase, groupId, baseCurrency);
   const [{ data: splitRows }, { data: recordedRows }] = await Promise.all([
     supabase
       .from("expense_splits")
