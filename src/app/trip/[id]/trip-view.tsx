@@ -1,27 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import type { Balance, Expense, Member, Settlement } from "@/lib/mock-data";
 import { BottomNav } from "@/components/bottom-nav";
-import { ExpensesList } from "@/components/expenses-list";
-import { BalancesPanel } from "@/components/balances-panel";
-import { SettleTab, type RecordedPayment } from "@/components/settle-tab";
+
+function TabFallback() {
+  return (
+    <div className="animate-pulse">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="list-item bg-white border-b border-[var(--border-color)]">
+          <div className="w-9 h-9 rounded-lg bg-[var(--border-color)] flex-shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3.5 w-2/3 rounded bg-[var(--border-color)]" />
+            <div className="h-2.5 w-1/3 rounded bg-[var(--border-color)]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type Tab = "expenses" | "balances" | "settle";
 
-interface TripViewProps {
+interface TripShellProps {
   tripId: string;
   tripName: string;
-  members: Member[];
-  expenses: Expense[];
-  balances: Balance[];
-  settlements: Settlement[];
-  recorded: RecordedPayment[];
+  expensesPane: ReactNode;
+  balancesPane: ReactNode;
+  settlePane: ReactNode;
 }
 
-export function TripView({ tripId, tripName, members, expenses, balances, settlements, recorded }: TripViewProps) {
+export function TripShell({ tripId, tripName, expensesPane, balancesPane, settlePane }: TripShellProps) {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") as Tab) || "expenses";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
@@ -66,11 +76,17 @@ export function TripView({ tripId, tripName, members, expenses, balances, settle
         </div>
       </header>
 
-      {/* Content */}
+      {/* Content — panes stay mounted (hidden) so tab switches never refetch */}
       <main className="pb-[calc(4rem+var(--safe-bottom))]">
-        {activeTab === "expenses" && <ExpensesList expenses={expenses} members={members} />}
-        {activeTab === "balances" && <BalancesPanel balances={balances} members={members} />}
-        {activeTab === "settle" && <SettleTab groupId={tripId} settlements={settlements} recorded={recorded} members={members} />}
+        <div hidden={activeTab !== "expenses"}>
+          <Suspense fallback={<TabFallback />}>{expensesPane}</Suspense>
+        </div>
+        <div hidden={activeTab !== "balances"}>
+          <Suspense fallback={<TabFallback />}>{balancesPane}</Suspense>
+        </div>
+        <div hidden={activeTab !== "settle"}>
+          <Suspense fallback={<TabFallback />}>{settlePane}</Suspense>
+        </div>
       </main>
 
       {/* FAB — Add Expense */}
