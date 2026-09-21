@@ -4,11 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
+import { success } from "@/lib/haptics";
+import { toast } from "@/components/toast";
+import { useJoinGroup } from "@/lib/mutations";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/join-code";
 
 export default function JoinPage() {
   const router = useRouter();
   const supabase = createClient();
+  const joinGroup = useJoinGroup();
 
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,9 +31,10 @@ export default function JoinPage() {
         router.push("/login");
         return;
       }
-      const { data, error } = await supabase.rpc("join_group", { p_code: normalized });
-      if (error) throw error;
-      router.push(`/trip/${data}`);
+      const groupId = await joinGroup.mutateAsync(normalized);
+      success();
+      toast("Joined group");
+      router.push(`/trip/${groupId}`);
     } catch (err) {
       setError(errorMessage(err, "Could not join group"));
     } finally {

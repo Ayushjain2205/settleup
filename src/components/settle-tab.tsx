@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { useRecordSettlement } from "@/lib/mutations";
 import { errorMessage } from "@/lib/error";
 import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
@@ -28,8 +27,7 @@ const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
 
 export function SettleTab({ groupId, settlements, recorded, members }: SettleTabProps) {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const supabase = createClient();
+  const recordSettlement = useRecordSettlement(groupId);
   const [recording, setRecording] = useState<string | null>(null);
   const [recordedIds, setRecordedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -43,39 +41,30 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
 
   const getMember = (id: string) => members.find((m) => m.id === id);
 
-  const handleRecord = async (s: Settlement, key: string) => {
+  const handleRecord = (s: Settlement, key: string) => {
     setRecording(key);
     setError(null);
     setRecordedIds((prev) => new Set(prev).add(key));
     success();
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/login");
-        return;
+    recordSettlement.mutate(
+      { from: s.from, to: s.to, amount: s.amount, currency: s.currency },
+      {
+        onSuccess: () => toast("Payment recorded"),
+        onError: (err) => {
+          setRecordedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+          if (err instanceof Error && err.message === "Not signed in") {
+            router.push("/login");
+            return;
+          }
+          setError(errorMessage(err, "Could not record payment"));
+        },
+        onSettled: () => setRecording(null),
       }
-      const { error } = await supabase.from("settlements").insert({
-        group_id: groupId,
-        from_member: s.from,
-        to_member: s.to,
-        amount: s.amount,
-        currency: s.currency,
-        status: "confirmed",
-        created_by: user.id,
-      });
-      if (error) throw error;
-      toast("Payment recorded");
-      queryClient.invalidateQueries({ queryKey: ["settlements", groupId] });
-    } catch (err) {
-      setRecordedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
-      });
-      setError(errorMessage(err, "Could not record payment"));
-    } finally {
-      setRecording(null);
-    }
+    );
   };
 
   if (visible.length === 0 && recorded.length === 0) {

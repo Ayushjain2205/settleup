@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
-import { deleteExpense } from "@/lib/expenses";
+import { useDeleteExpense } from "@/lib/mutations";
 import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
 import type { Expense, Member } from "@/lib/mock-data";
@@ -32,9 +31,7 @@ const BROAD_COLOR: Record<string, string> = {
 };
 
 export function ExpensesList({ expenses, members, splitDetails, groupId }: ExpensesListProps) {
-  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const groupedByDate = expenses.reduce((acc, expense) => {
-    if (removedIds.has(expense.id)) return acc;
     if (!acc[expense.date]) acc[expense.date] = [];
     acc[expense.date].push(expense);
     return acc;
@@ -45,48 +42,23 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
   const [openId, setOpenId] = useState<string | null>(null);
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const queryClient = useQueryClient();
-  const supabase = createClient();
+  const deleteExpense = useDeleteExpense(groupId);
   const openExpense = openId ? expenses.find((e) => e.id === openId) || null : null;
 
-  const syncAfterDelete = () => {
-    queryClient.invalidateQueries({ queryKey: ["expenses", groupId] });
-    queryClient.invalidateQueries({ queryKey: ["groups"] });
-  };
-
-  const forget = (id: string) =>
-    setRemovedIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-  const unforgot = (id: string) =>
-    setRemovedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-
-  const handleSwipeDelete = async (id: string) => {
-    forget(id);
+  const handleSwipeDelete = (id: string) => {
+    setDeletingId(id);
     setSwipeOpenId(null);
     success();
-    const message = await deleteExpense(supabase, id);
-    setDeletingId(null);
-    if (message) {
-      unforgot(id);
-      toast(message);
-      return;
-    }
-    toast("Expense deleted");
-    syncAfterDelete();
+    deleteExpense.mutate(id, {
+      onSuccess: () => toast("Expense deleted"),
+      onError: (err) => toast(err instanceof Error ? err.message : "Could not delete expense"),
+      onSettled: () => setDeletingId(null),
+    });
   };
 
-  const handleDetailDeleted = (id: string) => {
-    forget(id);
+  const handleDetailDeleted = () => {
     success();
     toast("Expense deleted");
-    syncAfterDelete();
   };
 
   const getIcon = (broad: string) => {

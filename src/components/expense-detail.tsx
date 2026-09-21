@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { deleteExpense } from "@/lib/expenses";
+import { useDeleteExpense } from "@/lib/mutations";
 import { errorMessage } from "@/lib/error";
 import type { Expense, Member } from "@/lib/mock-data";
 
@@ -20,25 +19,27 @@ const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
 
 export function ExpenseDetail({ groupId, expense, members, splits, onClose, onDeleted }: ExpenseDetailProps) {
   const router = useRouter();
-  const supabase = createClient();
+  const deleteExpense = useDeleteExpense(groupId);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const getMember = (id: string) => members.find((m) => m.id === id);
   const payer = getMember(expense.paidBy);
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!window.confirm(`Delete "${expense.title}"? This can't be undone.`)) return;
     setIsDeleting(true);
     setError(null);
-    const message = await deleteExpense(supabase, expense.id);
-    if (message) {
-      setError(errorMessage(message, "Could not delete expense"));
-      setIsDeleting(false);
-      return;
-    }
-    onClose();
-    onDeleted(expense.id);
+    deleteExpense.mutate(expense.id, {
+      onSuccess: () => {
+        onClose();
+        onDeleted(expense.id);
+      },
+      onError: (err) => {
+        setError(errorMessage(err, "Could not delete expense"));
+        setIsDeleting(false);
+      },
+    });
   };
 
   return (

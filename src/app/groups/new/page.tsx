@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
-import { generateJoinCode } from "@/lib/join-code";
+import { useCreateGroup } from "@/lib/mutations";
 import { StepIndicator } from "@/components/step-indicator";
 import { StepBasics } from "@/components/step-basics";
 import { StepCurrency } from "@/components/step-currency";
@@ -42,6 +42,7 @@ export default function GroupWizard() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const createGroup = useCreateGroup();
 
   const updateFormData = (partial: Partial<GroupFormData>) => {
     setFormData((prev) => ({ ...prev, ...partial }));
@@ -72,46 +73,24 @@ export default function GroupWizard() {
         return;
       }
 
-      // Insert with a fresh code per attempt in case of collision
-      let group: { id: string } | null = null;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const { data, error } = await supabase
-          .from("groups")
-          .insert({
-            name: formData.name.trim(),
-            type: formData.tripType,
-            base_currency: formData.baseCurrency,
-            spend_currency: formData.spendCurrency,
-            fx_mode: formData.fxMode,
-            fixed_fx_rate: formData.fixedFxRate,
-            simplify_debts: formData.simplifyDebts,
-            join_code: generateJoinCode(),
-            created_by: user.id,
-          })
-          .select("id")
-          .single();
-        if (!error) {
-          group = data;
-          break;
-        }
-        if (error.code !== "23505" || attempt === 2) throw error;
-      }
-      if (!group) throw new Error("Could not create group");
-
       const displayName =
         (user.user_metadata?.display_name as string) ||
         user.email?.split("@")[0] ||
         "You";
 
-      const { error: memberError } = await supabase.from("group_members").insert({
-        group_id: group.id,
-        user_id: user.id,
-        name: displayName,
-        avatar: displayName[0]?.toUpperCase() || "Y",
+      const groupId = await createGroup.mutateAsync({
+        name: formData.name.trim(),
+        type: formData.tripType,
+        baseCurrency: formData.baseCurrency,
+        spendCurrency: formData.spendCurrency,
+        fxMode: formData.fxMode,
+        fixedFxRate: formData.fixedFxRate,
+        simplifyDebts: formData.simplifyDebts,
+        userId: user.id,
+        memberName: displayName,
       });
-      if (memberError) throw memberError;
 
-      setCreatedGroupId(group.id);
+      setCreatedGroupId(groupId);
       setIsSuccess(true);
     } catch (err) {
       setError(errorMessage(err, "Could not create group"));

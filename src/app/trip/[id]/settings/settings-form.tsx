@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
 import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
+import { useAddMember } from "@/lib/mutations";
 
 interface SettingsFormProps {
   group: {
@@ -37,6 +38,7 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const addMember = useAddMember(group.id);
   const [pending, setPending] = useState<{ id: string; name: string; avatar: string; userId: null; email: string | null }[]>([]);
 
   // Server data caught up — drop optimistic rows
@@ -98,10 +100,10 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
     router.push("/");
   };
 
-  const handleAddMember = async () => {
+  const handleAddMember = () => {
     const name = newName.trim();
     const email = newEmail.trim().toLowerCase();
-    if (name.length < 1) return;
+    if (name.length < 1 || isAdding) return;
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       setError("Enter a valid email or leave it blank");
       return;
@@ -114,20 +116,20 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
     setNewEmail("");
     setShowAddMember(false);
     success();
-    const { error } = await supabase.from("group_members").insert({
-      group_id: group.id,
-      name,
-      avatar: name[0]?.toUpperCase() || "?",
-      email: email || null,
-    });
-    setIsAdding(false);
-    if (error) {
-      setPending((prev) => prev.filter((m) => m.id !== tempId));
-      setError(errorMessage(error, "Could not add member"));
-      return;
-    }
-    toast("Member added");
-    router.refresh();
+    addMember.mutate(
+      { name, avatar: name[0]?.toUpperCase() || "?", email: email || null },
+      {
+        onSuccess: () => {
+          toast("Member added");
+          router.refresh();
+        },
+        onError: (err) => {
+          setPending((prev) => prev.filter((m) => m.id !== tempId));
+          setError(errorMessage(err, "Could not add member"));
+        },
+        onSettled: () => setIsAdding(false),
+      }
+    );
   };
 
   return (

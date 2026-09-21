@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
 import { success, failure } from "@/lib/haptics";
 import { toast } from "@/components/toast";
+import { useSaveExpense } from "@/lib/mutations";
 import { computeSplitOwes } from "@/lib/splits";
 import { compressImage, mapScanToLines, type ScanResult } from "@/lib/scan";
 import { PayerPicker } from "@/components/payer-picker";
@@ -72,6 +73,7 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
   const [scanStage, setScanStage] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const scanTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const saveExpense = useSaveExpense(group.id);
 
   const SCAN_STAGES = ["Uploading receipt…", "Reading receipt…", "Extracting items…"];
 
@@ -140,28 +142,25 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
         return;
       }
 
-      const splits = computeSplits();
-      const { error: saveError } = await supabase.rpc("save_expense", {
-        p_group_id: group.id,
-        p_title: title.trim(),
-        p_amount: amountNum,
-        p_currency: currency,
-        p_base_amount: Math.round(baseAmount * 100) / 100,
-        p_category_id: category?.id || "other",
-        p_paid_by: paidBy,
-        p_split_mode: splitMode,
-        p_expense_date: expenseDate,
-        p_splits: splits,
-        p_expense_id: isEdit ? initial.id : null,
+      await saveExpense.mutateAsync({
+        title: title.trim(),
+        amount: amountNum,
+        currency,
+        baseAmount,
+        categoryId: category?.id || "other",
+        paidBy,
+        splitMode,
+        expenseDate,
+        splits: computeSplits(),
+        expenseId: isEdit ? initial.id : null,
       });
-      if (saveError) throw saveError;
 
       router.push(`/trip/${group.id}`);
-      router.refresh();
       success();
       toast(isEdit ? "Expense updated" : "Expense added");
     } catch (err) {
       setError(errorMessage(err, "Could not save expense"));
+      failure();
     } finally {
       setIsSubmitting(false);
     }
