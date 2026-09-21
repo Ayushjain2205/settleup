@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { deleteExpense } from "@/lib/expenses";
 import { errorMessage } from "@/lib/error";
-import { success } from "@/lib/haptics";
-import { toast } from "@/components/toast";
 import type { Expense, Member } from "@/lib/mock-data";
 
 interface ExpenseDetailProps {
@@ -15,11 +13,12 @@ interface ExpenseDetailProps {
   members: Member[];
   splits: { memberId: string; amount: number }[];
   onClose: () => void;
+  onDeleted: (id: string) => void;
 }
 
 const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
 
-export function ExpenseDetail({ groupId, expense, members, splits, onClose }: ExpenseDetailProps) {
+export function ExpenseDetail({ groupId, expense, members, splits, onClose, onDeleted }: ExpenseDetailProps) {
   const router = useRouter();
   const supabase = createClient();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -39,9 +38,7 @@ export function ExpenseDetail({ groupId, expense, members, splits, onClose }: Ex
       return;
     }
     onClose();
-    router.refresh();
-    success();
-    toast("Expense deleted");
+    onDeleted(expense.id);
   };
 
   return (

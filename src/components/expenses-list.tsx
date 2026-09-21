@@ -32,7 +32,9 @@ const BROAD_COLOR: Record<string, string> = {
 };
 
 export function ExpensesList({ expenses, members, splitDetails, groupId }: ExpensesListProps) {
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const groupedByDate = expenses.reduce((acc, expense) => {
+    if (removedIds.has(expense.id)) return acc;
     if (!acc[expense.date]) acc[expense.date] = [];
     acc[expense.date].push(expense);
     return acc;
@@ -47,15 +49,36 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
   const supabase = createClient();
   const openExpense = openId ? expenses.find((e) => e.id === openId) || null : null;
 
+  const forget = (id: string) =>
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  const unforgot = (id: string) =>
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+
   const handleSwipeDelete = async (id: string) => {
-    setDeletingId(id);
+    forget(id);
+    setSwipeOpenId(null);
+    success();
     const message = await deleteExpense(supabase, id);
     setDeletingId(null);
-    setSwipeOpenId(null);
     if (message) {
+      unforgot(id);
       toast(message);
       return;
     }
+    toast("Expense deleted");
+    router.refresh();
+  };
+
+  const handleDetailDeleted = (id: string) => {
+    forget(id);
     success();
     toast("Expense deleted");
     router.refresh();
@@ -139,6 +162,7 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
           members={members}
           splits={splitDetails[openExpense.id] || []}
           onClose={() => setOpenId(null)}
+          onDeleted={handleDetailDeleted}
         />
       )}
     </div>
