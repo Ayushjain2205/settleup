@@ -49,7 +49,11 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
   const [category, setCategory] = useState<Category | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanStage, setScanStage] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const scanTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const SCAN_STAGES = ["Uploading receipt…", "Reading receipt…", "Extracting items…"];
 
   // Smart auto-categorization: guess category from description
   useEffect(() => {
@@ -158,7 +162,11 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
     e.target.value = "";
     if (!file || isScanning) return;
     setIsScanning(true);
+    setScanStage(0);
     setError(null);
+    scanTimer.current = setInterval(() => {
+      setScanStage((s) => (s < SCAN_STAGES.length - 1 ? s + 1 : s));
+    }, 2400);
     try {
       const blob = await compressImage(file);
       const form = new FormData();
@@ -179,6 +187,7 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not read receipt");
     } finally {
+      if (scanTimer.current) clearInterval(scanTimer.current);
       setIsScanning(false);
     }
   };
@@ -284,6 +293,15 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
 
         {error && (
           <p className="text-xs font-medium text-[var(--error)] bg-[var(--error)]/5 border border-[var(--error)]/20 rounded-xl px-4 py-2.5 mt-4">{error}</p>
+        )}
+
+        {isScanning && (
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <svg className="w-4 h-4 animate-spin text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            <span className="text-xs font-medium text-[var(--muted)]">{SCAN_STAGES[scanStage]}</span>
+          </div>
         )}
 
         {/* Spacer */}
