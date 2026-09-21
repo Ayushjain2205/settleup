@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/browser";
 import { CATEGORIES } from "@/lib/categories";
+import { mapGroupRows } from "@/lib/group-map";
+import { buildFeed } from "@/lib/feed";
 import type { Expense, Member } from "@/lib/mock-data";
 
 export function useSession() {
@@ -75,24 +77,7 @@ export function useGroups() {
         .select("id, name, base_currency, group_members(id, avatar), expenses(base_amount, expense_date)")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (groups || []).map((g) => {
-        const expenses = g.expenses || [];
-        const totalSpent = expenses.reduce((sum, e) => sum + Number(e.base_amount), 0);
-        const lastDate =
-          expenses
-            .map((e) => e.expense_date)
-            .filter(Boolean)
-            .sort()
-            .reverse()[0] || null;
-        return {
-          id: g.id,
-          name: g.name,
-          baseCurrency: g.base_currency,
-          members: g.group_members || [],
-          totalSpent,
-          lastDate,
-        };
-      });
+      return mapGroupRows(groups || []);
     },
     enabled: !!session,
   });
@@ -213,7 +198,7 @@ export function useActivityFeed() {
     ...useQuery({
       queryKey: ["activity", groupIds.join(",")],
       queryFn: async (): Promise<FeedItem[]> => {
-        const groupById = new Map((groups || []).map((g) => [g.id, g]));
+        const groupList = (groups || []).map((g) => ({ id: g.id, name: g.name, baseCurrency: g.baseCurrency }));
         const [{ data: members }, { data: expenses }, { data: settlements }] = await Promise.all([
           supabase.from("group_members").select("id, group_id, name, user_id").in("group_id", groupIds),
           supabase
@@ -230,43 +215,7 @@ export function useActivityFeed() {
             .order("created_at", { ascending: false })
             .limit(20),
         ]);
-        const memberById = new Map((members || []).map((m) => [m.id, m]));
-        const nameOf = (memberId: string) => {
-          const m = memberById.get(memberId);
-          if (!m) return "Someone";
-          return m.user_id === userId ? "You" : m.name;
-        };
-        const initialOf = (memberId: string) => nameOf(memberId)[0]?.toUpperCase() || "?";
-        const feed: FeedItem[] = [];
-        for (const e of expenses || []) {
-          const g = groupById.get(e.group_id);
-          if (!g) continue;
-          feed.push({
-            key: `e-${e.id}`,
-            at: e.created_at,
-            subject: nameOf(e.paid_by),
-            initial: initialOf(e.paid_by),
-            action: "added expense",
-            detail: e.title,
-            amount: `${symbol(g.baseCurrency)}${Number(e.base_amount).toLocaleString()}`,
-            trip: g.name,
-          });
-        }
-        for (const s of settlements || []) {
-          const g = groupById.get(s.group_id);
-          if (!g) continue;
-          feed.push({
-            key: `s-${s.id}`,
-            at: s.created_at,
-            subject: nameOf(s.from_member),
-            initial: initialOf(s.from_member),
-            action: "paid",
-            detail: memberById.get(s.to_member)?.name || "someone",
-            amount: `${symbol(s.currency)}${Number(s.amount).toLocaleString()}`,
-            trip: g.name,
-          });
-        }
-        return feed.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
+        return buildFeed(groupList, members || [], expenses || [], settlements || [], userId);
       },
       enabled: !sessionLoading && !!session && groupIds.length > 0,
     }),
