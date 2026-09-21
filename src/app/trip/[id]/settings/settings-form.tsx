@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/error";
 import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
 
@@ -36,6 +37,14 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [pending, setPending] = useState<{ id: string; name: string; avatar: string; userId: null; email: string | null }[]>([]);
+
+  // Server data caught up — drop optimistic rows
+  useEffect(() => {
+    setPending([]);
+  }, [members]);
+
+  const allMembers = [...members, ...pending];
 
   const isCreator = group.createdBy === currentUserId;
 
@@ -99,6 +108,12 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
     }
     setIsAdding(true);
     setError(null);
+    const tempId = `temp-${Date.now()}`;
+    setPending((prev) => [...prev, { id: tempId, name, avatar: name[0]?.toUpperCase() || "?", userId: null, email: email || null }]);
+    setNewName("");
+    setNewEmail("");
+    setShowAddMember(false);
+    success();
     const { error } = await supabase.from("group_members").insert({
       group_id: group.id,
       name,
@@ -107,15 +122,12 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
     });
     setIsAdding(false);
     if (error) {
-      setError(error.message);
+      setPending((prev) => prev.filter((m) => m.id !== tempId));
+      setError(errorMessage(error, "Could not add member"));
       return;
     }
-    setNewName("");
-    setNewEmail("");
-    setShowAddMember(false);
-    router.refresh();
-    success();
     toast("Member added");
+    router.refresh();
   };
 
   return (
@@ -205,7 +217,7 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
             </button>
           </div>
           <div className="divide-y divide-[var(--border-color)]">
-            {members.map((member) => (
+            {allMembers.map((member) => (
               <div key={member.id} className="flex items-center gap-3 py-2.5">
                 <div className="w-8 h-8 rounded-full bg-[var(--foreground)] flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">{member.avatar}</div>
                 <div className="flex-1 min-w-0">

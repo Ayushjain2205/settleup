@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
@@ -29,13 +29,23 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
   const router = useRouter();
   const supabase = createClient();
   const [recording, setRecording] = useState<string | null>(null);
+  const [recordedIds, setRecordedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+
+  // Server data caught up — drop optimistic marks
+  useEffect(() => {
+    setRecordedIds(new Set());
+  }, [settlements]);
+
+  const visible = settlements.filter((s) => !recordedIds.has(`${s.from}-${s.to}-${s.amount}`));
 
   const getMember = (id: string) => members.find((m) => m.id === id);
 
   const handleRecord = async (s: Settlement, key: string) => {
     setRecording(key);
     setError(null);
+    setRecordedIds((prev) => new Set(prev).add(key));
+    success();
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -52,17 +62,21 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
         created_by: user.id,
       });
       if (error) throw error;
-      router.refresh();
-      success();
       toast("Payment recorded");
+      router.refresh();
     } catch (err) {
+      setRecordedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
       setError(errorMessage(err, "Could not record payment"));
     } finally {
       setRecording(null);
     }
   };
 
-  if (settlements.length === 0 && recorded.length === 0) {
+  if (visible.length === 0 && recorded.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 px-6">
         <div className="w-12 h-12 rounded-full bg-[var(--success)]/10 flex items-center justify-center mb-3">
@@ -82,19 +96,19 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
         <p className="mx-4 mt-4 text-xs font-medium text-[var(--error)] bg-[var(--error)]/5 border border-[var(--error)]/20 rounded-xl px-4 py-2.5">{error}</p>
       )}
 
-      {settlements.length > 0 && (
+      {visible.length > 0 && (
         <>
           {/* Summary */}
           <div className="px-4 py-3 bg-white border-b border-[var(--border-color)]">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--muted)]">{settlements.length} payment{settlements.length !== 1 ? "s" : ""} needed</span>
+              <span className="text-xs text-[var(--muted)]">{visible.length} payment{visible.length !== 1 ? "s" : ""} needed</span>
               <span className="text-xs font-medium text-[var(--primary)]">Simplified</span>
             </div>
           </div>
 
           {/* Settlement list */}
           <div className="divide-y divide-[var(--border-color)]">
-            {settlements.map((s) => {
+            {visible.map((s) => {
               const from = getMember(s.from);
               const to = getMember(s.to);
               if (!from || !to) return null;
