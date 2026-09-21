@@ -67,7 +67,7 @@ export function TripView({ tripId, tripName, members, expenses, balances, settle
       </header>
 
       {/* Content */}
-      <main className="pb-20">
+      <main className="pb-[calc(4rem+var(--safe-bottom))]">
         {activeTab === "expenses" && <ExpensesList expenses={expenses} members={members} />}
         {activeTab === "balances" && <BalancesPanel balances={balances} members={members} />}
         {activeTab === "settle" && <SettleTab groupId={tripId} settlements={settlements} recorded={recorded} members={members} />}

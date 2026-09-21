@@ -48,7 +48,7 @@ export default async function GroupsPage() {
         </div>
       </header>
 
-      <main className="pb-20">
+      <main className="pb-[calc(4rem+var(--safe-bottom))]">
         {/* Active groups */}
         <div className="px-4 pt-4 pb-2">
           <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Active</span>

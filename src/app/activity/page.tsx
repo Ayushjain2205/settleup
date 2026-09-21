@@ -104,7 +104,7 @@ export default async function ActivityPage() {
         </div>
       </header>
 
-      <main className="pb-20">
+      <main className="pb-[calc(4rem+var(--safe-bottom))]">
         {feed.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 px-6">
             <p className="text-sm font-medium text-[var(--foreground)]">No activity yet</p>

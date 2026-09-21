@@ -32,7 +32,7 @@ export default function AccountPage() {
         </div>
       </header>
 
-      <main className="pb-20">
+      <main className="pb-[calc(4rem+var(--safe-bottom))]">
         {/* Profile */}
         <div className="px-4 py-4 bg-white border-b border-[var(--border-color)]">
           <div className="flex items-center gap-3">
