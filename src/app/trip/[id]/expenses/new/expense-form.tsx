@@ -140,53 +140,21 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
         return;
       }
 
-      const { data: expense, error: expenseError } = isEdit
-        ? await supabase
-            .from("expenses")
-            .update({
-              title: title.trim(),
-              amount: amountNum,
-              currency,
-              base_amount: Math.round(baseAmount * 100) / 100,
-              category_id: category?.id || "other",
-              paid_by: paidBy,
-              split_mode: splitMode,
-              expense_date: expenseDate,
-            })
-            .eq("id", initial.id)
-            .select("id")
-            .single()
-        : await supabase
-            .from("expenses")
-            .insert({
-              group_id: group.id,
-              title: title.trim(),
-              amount: amountNum,
-              currency,
-              base_amount: Math.round(baseAmount * 100) / 100,
-              category_id: category?.id || "other",
-              paid_by: paidBy,
-              split_mode: splitMode,
-              expense_date: expenseDate,
-              created_by: user.id,
-            })
-            .select("id")
-            .single();
-      if (expenseError) throw expenseError;
-
-      const splits = computeSplits().map((s) => ({ expense_id: expense.id, member_id: s.memberId, amount_owed: s.amountOwed }));
-      if (isEdit) {
-        const { error: deleteError } = await supabase.from("expense_splits").delete().eq("expense_id", expense.id);
-        if (deleteError) throw deleteError;
-      }
-      const { error: splitsError } = await supabase.from("expense_splits").insert(splits);
-      if (splitsError) {
-        if (!isEdit) {
-          // Best-effort rollback so we never leave a split-less expense
-          await supabase.from("expenses").delete().eq("id", expense.id);
-        }
-        throw splitsError;
-      }
+      const splits = computeSplits();
+      const { error: saveError } = await supabase.rpc("save_expense", {
+        p_group_id: group.id,
+        p_title: title.trim(),
+        p_amount: amountNum,
+        p_currency: currency,
+        p_base_amount: Math.round(baseAmount * 100) / 100,
+        p_category_id: category?.id || "other",
+        p_paid_by: paidBy,
+        p_split_mode: splitMode,
+        p_expense_date: expenseDate,
+        p_splits: splits,
+        p_expense_id: isEdit ? initial.id : null,
+      });
+      if (saveError) throw saveError;
 
       router.push(`/trip/${group.id}`);
       router.refresh();
@@ -258,7 +226,7 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
           </button>
           <span className="flex-1 text-center text-[15px] font-semibold text-[var(--foreground)]">{isEdit ? "Edit expense" : "Add an expense"}</span>
           <button onClick={handleSubmit} disabled={!canSubmit || isSubmitting} className="text-sm font-bold text-[var(--primary)] disabled:opacity-40">
-            Save
+            {isSubmitting ? "Saving…" : "Save"}
           </button>
         </div>
       </header>
