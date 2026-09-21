@@ -17,6 +17,7 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "SettleUp",
     startupImage: [
+      { url: "/splash/splash-1290x2796.png" },
       { url: "/splash/splash-750x1334.png", media: "(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" },
       { url: "/splash/splash-1080x2340.png", media: "(device-width: 360px) and (device-height: 780px) and (-webkit-device-pixel-ratio: 3)" },
       { url: "/splash/splash-1179x2556.png", media: "(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" },
