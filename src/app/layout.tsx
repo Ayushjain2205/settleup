@@ -4,6 +4,7 @@ import "./globals.css";
 import { SwRegister } from "@/components/sw-register";
 import { BootSplash } from "@/components/boot-splash";
 import { Toaster } from "@/components/toast";
+import { Providers } from "@/components/providers";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -39,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <BootSplash />
         <SwRegister />
-        {children}
+        <Providers>{children}</Providers>
         <Toaster />
       </body>
     </html>
