@@ -2,34 +2,49 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
 import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
-import { useAddMember } from "@/lib/mutations";
+import { useMemberRows, useSession, useTripMeta } from "@/lib/queries";
+import { useAddMember, useDeleteGroup, useUpdateGroup } from "@/lib/mutations";
 
-interface SettingsFormProps {
-  group: {
-    id: string;
-    baseCurrency: string;
-    spendCurrency: string;
-    simplifyDebts: boolean;
-    fxMode: string;
-    fixedFxRate: number;
-    createdBy: string | null;
-    joinCode: string;
-  };
-  members: { id: string; name: string; avatar: string; userId: string | null; email: string | null }[];
-  currentUserId: string;
+function SettingsSkeleton() {
+  return (
+    <div className="min-h-dvh bg-[var(--background)] animate-pulse">
+      <header className="sticky top-0 z-40 bg-white/80 border-b border-[var(--border-color)]">
+        <div className="flex items-center h-14 px-4">
+          <div className="w-5 h-5 rounded bg-[var(--border-color)] mr-3" />
+          <div className="h-5 w-24 rounded bg-[var(--border-color)]" />
+        </div>
+      </header>
+      <main>
+        <div className="px-4 py-3 bg-white border-b border-[var(--border-color)]">
+          <div className="h-4 w-32 rounded bg-[var(--border-color)]" />
+        </div>
+        <div className="px-4 py-3 bg-white border-b border-[var(--border-color)]">
+          <div className="h-4 w-28 rounded bg-[var(--border-color)] mb-2" />
+          <div className="h-8 rounded-lg bg-[var(--border-color)]" />
+        </div>
+      </main>
+    </div>
+  );
 }
 
-export function SettingsForm({ group, members, currentUserId }: SettingsFormProps) {
+export function SettingsForm({ groupId }: { groupId: string }) {
   const router = useRouter();
-  const supabase = createClient();
+  const { data: session, isLoading: sessionLoading } = useSession();
+  const ready = !sessionLoading && !!session;
+  const { data: meta, isLoading: metaLoading } = useTripMeta(groupId, ready);
+  const { data: memberRows } = useMemberRows(groupId, ready);
+  const members = memberRows || [];
 
-  const [simplifyDebts, setSimplifyDebts] = useState(group.simplifyDebts);
-  const [fxMode, setFxMode] = useState(group.fxMode);
-  const [fixedRate, setFixedRate] = useState(group.fixedFxRate.toString());
+  const updateGroup = useUpdateGroup(groupId);
+  const deleteGroup = useDeleteGroup();
+  const addMember = useAddMember(groupId);
+
+  const [simplifyDebts, setSimplifyDebts] = useState<boolean | null>(null);
+  const [fxMode, setFxMode] = useState<string | null>(null);
+  const [fixedRate, setFixedRate] = useState("");
   const [isEditingRate, setIsEditingRate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -38,66 +53,80 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  const addMember = useAddMember(group.id);
   const [pending, setPending] = useState<{ id: string; name: string; avatar: string; userId: null; email: string | null }[]>([]);
 
-  // Server data caught up — drop optimistic rows
+  // Seed + re-sync local toggles from cache
+  useEffect(() => {
+    if (meta) {
+      setSimplifyDebts(meta.simplifyDebts);
+      setFxMode(meta.fxMode);
+      setFixedRate(String(meta.fxRate));
+    }
+  }, [meta]);
   useEffect(() => {
     setPending([]);
-  }, [members]);
+  }, [memberRows]);
+
+  useEffect(() => {
+    if (!sessionLoading && !session) router.replace("/login");
+  }, [sessionLoading, session, router]);
+
+  if (sessionLoading || !session || !meta || simplifyDebts === null || fxMode === null) {
+    return <SettingsSkeleton />;
+  }
 
   const allMembers = [...members, ...pending];
+  const isCreator = meta.createdBy === session.user.id;
 
-  const isCreator = group.createdBy === currentUserId;
-
-  const updateGroup = async (patch: Record<string, unknown>, revert: () => void) => {
+  const patch = (p: Record<string, unknown>, revert: () => void) => {
     setError(null);
-    const { error } = await supabase.from("groups").update(patch).eq("id", group.id);
-    if (error) {
-      revert();
-      setError(error.message);
-    }
+    updateGroup.mutate(p, {
+      onError: (err) => {
+        revert();
+        setError(errorMessage(err, "Could not save setting"));
+      },
+    });
   };
 
   const toggleSimplify = () => {
     const next = !simplifyDebts;
     setSimplifyDebts(next);
-    updateGroup({ simplify_debts: next }, () => setSimplifyDebts(!next));
+    patch({ simplify_debts: next }, () => setSimplifyDebts(!next));
   };
 
   const changeFxMode = (mode: string) => {
     const prev = fxMode;
     setFxMode(mode);
-    updateGroup({ fx_mode: mode }, () => setFxMode(prev));
+    patch({ fx_mode: mode }, () => setFxMode(prev));
   };
 
   const saveRate = () => {
     const rate = parseFloat(fixedRate);
     if (!rate || rate <= 0) {
-      setFixedRate(group.fixedFxRate.toString());
+      setFixedRate(String(meta.fxRate));
       setIsEditingRate(false);
       return;
     }
     setIsEditingRate(false);
-    updateGroup({ fixed_fx_rate: rate }, () => setFixedRate(group.fixedFxRate.toString()));
+    patch({ fixed_fx_rate: rate }, () => setFixedRate(String(meta.fxRate)));
   };
 
   const handleCopyCode = async () => {
-    await navigator.clipboard.writeText(group.joinCode);
+    await navigator.clipboard.writeText(meta.joinCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!window.confirm(`Delete this group and all its expenses? This can't be undone.`)) return;
     setIsDeleting(true);
-    const { error } = await supabase.from("groups").delete().eq("id", group.id);
-    if (error) {
-      setError(error.message);
-      setIsDeleting(false);
-      return;
-    }
-    router.push("/");
+    deleteGroup.mutate(groupId, {
+      onSuccess: () => router.push("/"),
+      onError: (err) => {
+        setError(errorMessage(err, "Could not delete group"));
+        setIsDeleting(false);
+      },
+    });
   };
 
   const handleAddMember = () => {
@@ -119,10 +148,7 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
     addMember.mutate(
       { name, avatar: name[0]?.toUpperCase() || "?", email: email || null },
       {
-        onSuccess: () => {
-          toast("Member added");
-          router.refresh();
-        },
+        onSuccess: () => toast("Member added"),
         onError: (err) => {
           setPending((prev) => prev.filter((m) => m.id !== tempId));
           setError(errorMessage(err, "Could not add member"));
@@ -177,7 +203,7 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
           </div>
           {fxMode === "fixed" && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-[var(--muted)]">1 {group.spendCurrency} =</span>
+              <span className="text-xs text-[var(--muted)]">1 {meta.spendCurrency} =</span>
               {isEditingRate ? (
                 <div className="flex items-center gap-1.5">
                   <input type="number" step="0.01" value={fixedRate} onChange={(e) => setFixedRate(e.target.value)} className="w-20 px-2 py-1 bg-[var(--background)] border border-[var(--primary)] rounded-md text-xs focus:outline-none" />
@@ -185,7 +211,7 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
                 </div>
               ) : (
                 <button onClick={() => setIsEditingRate(true)} className="text-xs font-semibold text-[var(--foreground)]">
-                  {fixedRate} {group.baseCurrency}
+                  {fixedRate} {meta.baseCurrency}
                 </button>
               )}
             </div>
@@ -204,7 +230,7 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
             </div>
             <button onClick={handleCopyCode} className="px-3 py-2 rounded-lg bg-[var(--primary)]/10 active:bg-[var(--primary)]/20 transition-colors">
               <span className="text-sm font-bold tracking-[0.2em] text-[var(--primary)] tabular-nums">
-                {copiedCode ? "Copied!" : group.joinCode}
+                {copiedCode ? "Copied!" : meta.joinCode}
               </span>
             </button>
           </div>
@@ -224,7 +250,7 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
                 <div className="w-8 h-8 rounded-full bg-[var(--foreground)] flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">{member.avatar}</div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-[var(--foreground)] truncate">
-                    {member.name}{member.userId === currentUserId && <span className="ml-1 text-[10px] text-[var(--muted)]">(You)</span>}
+                    {member.name}{member.userId === session?.user.id && <span className="ml-1 text-[10px] text-[var(--muted)]">(You)</span>}
                   </div>
                   {member.userId === null && member.email && (
                     <div className="text-[10px] text-[var(--muted)] truncate">

@@ -36,6 +36,17 @@ export interface TripMeta {
   spendCurrency: string;
   fxRate: number;
   simplifyDebts: boolean;
+  createdBy: string | null;
+  joinCode: string;
+  fxMode: string;
+}
+
+export interface MemberRow {
+  id: string;
+  name: string;
+  avatar: string;
+  userId: string | null;
+  email: string | null;
 }
 
 export interface ExpenseWithSplits {
@@ -96,7 +107,7 @@ export function useTripMeta(groupId: string, sessionReady: boolean) {
     queryFn: async (): Promise<TripMeta> => {
       const { data, error } = await supabase
         .from("groups")
-        .select("id, name, base_currency, spend_currency, fixed_fx_rate, simplify_debts")
+        .select("id, name, base_currency, spend_currency, fixed_fx_rate, simplify_debts, created_by, join_code, fx_mode")
         .eq("id", groupId)
         .single();
       if (error) throw error;
@@ -107,6 +118,9 @@ export function useTripMeta(groupId: string, sessionReady: boolean) {
         spendCurrency: data.spend_currency,
         fxRate: Number(data.fixed_fx_rate),
         simplifyDebts: data.simplify_debts,
+        createdBy: data.created_by,
+        joinCode: data.join_code,
+        fxMode: data.fx_mode,
       };
     },
     enabled: sessionReady,
@@ -114,15 +128,23 @@ export function useTripMeta(groupId: string, sessionReady: boolean) {
 }
 
 export function useMembers(groupId: string, sessionReady: boolean) {
+  const { data, ...rest } = useMemberRows(groupId, sessionReady);
+  return {
+    ...rest,
+    data: data?.map((m) => ({ id: m.id, name: m.name, avatar: m.avatar, upiId: undefined })),
+  };
+}
+
+export function useMemberRows(groupId: string, sessionReady: boolean) {
   return useQuery({
     queryKey: ["members", groupId],
-    queryFn: async (): Promise<Member[]> => {
+    queryFn: async (): Promise<MemberRow[]> => {
       const { data, error } = await supabase
         .from("group_members")
-        .select("id, name, avatar, upi_id")
+        .select("id, name, avatar, user_id, email")
         .eq("group_id", groupId);
       if (error) throw error;
-      return (data || []).map((m) => ({ id: m.id, name: m.name, avatar: m.avatar, upiId: m.upi_id || undefined }));
+      return (data || []).map((m) => ({ id: m.id, name: m.name, avatar: m.avatar, userId: m.user_id, email: m.email }));
     },
     enabled: sessionReady,
   });
@@ -166,6 +188,89 @@ export function useExpenses(groupId: string, baseCurrency: string, sessionReady:
     },
     enabled: sessionReady,
   });
+}
+
+export interface FeedItem {
+  key: string;
+  at: string;
+  subject: string;
+  initial: string;
+  action: string;
+  detail: string | null;
+  amount: string | null;
+  trip: string;
+}
+
+export function useActivityFeed() {
+  const { data: session, isLoading: sessionLoading } = useSession();
+  const { data: groups } = useGroups();
+  const groupIds = (groups || []).map((g) => g.id);
+  const userId = session?.user.id;
+
+  return {
+    session,
+    sessionLoading,
+    ...useQuery({
+      queryKey: ["activity", groupIds.join(",")],
+      queryFn: async (): Promise<FeedItem[]> => {
+        const groupById = new Map((groups || []).map((g) => [g.id, g]));
+        const [{ data: members }, { data: expenses }, { data: settlements }] = await Promise.all([
+          supabase.from("group_members").select("id, group_id, name, user_id").in("group_id", groupIds),
+          supabase
+            .from("expenses")
+            .select("id, group_id, title, base_amount, paid_by, created_at")
+            .in("group_id", groupIds)
+            .order("created_at", { ascending: false })
+            .limit(20),
+          supabase
+            .from("settlements")
+            .select("id, group_id, from_member, to_member, amount, currency, created_at")
+            .in("group_id", groupIds)
+            .eq("status", "confirmed")
+            .order("created_at", { ascending: false })
+            .limit(20),
+        ]);
+        const memberById = new Map((members || []).map((m) => [m.id, m]));
+        const nameOf = (memberId: string) => {
+          const m = memberById.get(memberId);
+          if (!m) return "Someone";
+          return m.user_id === userId ? "You" : m.name;
+        };
+        const initialOf = (memberId: string) => nameOf(memberId)[0]?.toUpperCase() || "?";
+        const feed: FeedItem[] = [];
+        for (const e of expenses || []) {
+          const g = groupById.get(e.group_id);
+          if (!g) continue;
+          feed.push({
+            key: `e-${e.id}`,
+            at: e.created_at,
+            subject: nameOf(e.paid_by),
+            initial: initialOf(e.paid_by),
+            action: "added expense",
+            detail: e.title,
+            amount: `${symbol(g.baseCurrency)}${Number(e.base_amount).toLocaleString()}`,
+            trip: g.name,
+          });
+        }
+        for (const s of settlements || []) {
+          const g = groupById.get(s.group_id);
+          if (!g) continue;
+          feed.push({
+            key: `s-${s.id}`,
+            at: s.created_at,
+            subject: nameOf(s.from_member),
+            initial: initialOf(s.from_member),
+            action: "paid",
+            detail: memberById.get(s.to_member)?.name || "someone",
+            amount: `${symbol(s.currency)}${Number(s.amount).toLocaleString()}`,
+            trip: g.name,
+          });
+        }
+        return feed.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
+      },
+      enabled: !sessionLoading && !!session && groupIds.length > 0,
+    }),
+  };
 }
 
 export function useRecorded(groupId: string, sessionReady: boolean) {

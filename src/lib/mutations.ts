@@ -193,3 +193,30 @@ export function useJoinGroup() {
     },
   });
 }
+
+export function useUpdateGroup(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: Record<string, unknown>) => {
+      const { error } = await supabase.from("groups").update(patch).eq("id", groupId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["trip", groupId] });
+      qc.invalidateQueries({ queryKey: ["groups"] });
+    },
+  });
+}
+
+export function useDeleteGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (groupId: string) => {
+      const { error } = await supabase.from("groups").delete().eq("id", groupId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["groups"] });
+    },
+  });
+}

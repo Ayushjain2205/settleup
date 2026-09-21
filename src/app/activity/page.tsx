@@ -1,17 +1,9 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { BottomNav } from "@/components/bottom-nav";
+"use client";
 
-interface FeedItem {
-  key: string;
-  at: string;
-  subject: string;
-  initial: string;
-  action: string;
-  detail: string | null;
-  amount: string | null;
-  trip: string;
-}
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useActivityFeed } from "@/lib/queries";
+import { BottomNav } from "@/components/bottom-nav";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -26,75 +18,13 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
+export default function ActivityPage() {
+  const router = useRouter();
+  const { session, sessionLoading, data: feed, isLoading } = useActivityFeed();
 
-export default async function ActivityPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/landing");
-
-  const { data: groups } = await supabase.from("groups").select("id, name, base_currency");
-  const groupIds = (groups || []).map((g) => g.id);
-  const groupById = new Map((groups || []).map((g) => [g.id, g]));
-
-  let feed: FeedItem[] = [];
-  if (groupIds.length > 0) {
-    const [{ data: members }, { data: expenses }, { data: settlements }] = await Promise.all([
-      supabase.from("group_members").select("id, group_id, name, user_id").in("group_id", groupIds),
-      supabase
-        .from("expenses")
-        .select("id, group_id, title, base_amount, paid_by, created_at")
-        .in("group_id", groupIds)
-        .order("created_at", { ascending: false })
-        .limit(20),
-      supabase
-        .from("settlements")
-        .select("id, group_id, from_member, to_member, amount, currency, created_at")
-        .in("group_id", groupIds)
-        .eq("status", "confirmed")
-        .order("created_at", { ascending: false })
-        .limit(20),
-    ]);
-
-    const memberById = new Map((members || []).map((m) => [m.id, m]));
-    const nameOf = (memberId: string) => {
-      const m = memberById.get(memberId);
-      if (!m) return "Someone";
-      return m.user_id === user.id ? "You" : m.name;
-    };
-    const initialOf = (memberId: string) => nameOf(memberId)[0]?.toUpperCase() || "?";
-
-    for (const e of expenses || []) {
-      const g = groupById.get(e.group_id);
-      if (!g) continue;
-      feed.push({
-        key: `e-${e.id}`,
-        at: e.created_at,
-        subject: nameOf(e.paid_by),
-        initial: initialOf(e.paid_by),
-        action: "added expense",
-        detail: e.title,
-        amount: `${symbol(g.base_currency)}${Number(e.base_amount).toLocaleString()}`,
-        trip: g.name,
-      });
-    }
-    for (const s of settlements || []) {
-      const g = groupById.get(s.group_id);
-      if (!g) continue;
-      feed.push({
-        key: `s-${s.id}`,
-        at: s.created_at,
-        subject: nameOf(s.from_member),
-        initial: initialOf(s.from_member),
-        action: "paid",
-        detail: memberById.get(s.to_member)?.name || "someone",
-        amount: `${symbol(s.currency)}${Number(s.amount).toLocaleString()}`,
-        trip: g.name,
-      });
-    }
-    feed.sort((a, b) => b.at.localeCompare(a.at));
-    feed = feed.slice(0, 30);
-  }
+  useEffect(() => {
+    if (!sessionLoading && !session) router.replace("/landing");
+  }, [sessionLoading, session, router]);
 
   return (
     <div className="min-h-dvh bg-[var(--background)]">
@@ -105,7 +35,21 @@ export default async function ActivityPage() {
       </header>
 
       <main className="pb-[calc(4rem+var(--safe-bottom))]">
-        {feed.length === 0 ? (
+        {isLoading || sessionLoading ? (
+          <div className="animate-pulse">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="px-4 py-3 bg-white border-b border-[var(--border-color)]">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[var(--border-color)] flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-3/4 rounded bg-[var(--border-color)]" />
+                    <div className="h-2.5 w-1/2 rounded bg-[var(--border-color)]" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : !feed || feed.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 px-6">
             <p className="text-sm font-medium text-[var(--foreground)]">No activity yet</p>
             <p className="text-xs text-[var(--muted)] mt-1">Expenses and payments will show up here</p>
