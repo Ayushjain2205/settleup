@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
 import { success } from "@/lib/haptics";
@@ -27,6 +28,7 @@ const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
 
 export function SettleTab({ groupId, settlements, recorded, members }: SettleTabProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const supabase = createClient();
   const [recording, setRecording] = useState<string | null>(null);
   const [recordedIds, setRecordedIds] = useState<Set<string>>(new Set());
@@ -63,7 +65,7 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
       });
       if (error) throw error;
       toast("Payment recorded");
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: ["settlements", groupId] });
     } catch (err) {
       setRecordedIds((prev) => {
         const next = new Set(prev);

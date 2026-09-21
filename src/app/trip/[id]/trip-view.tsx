@@ -1,9 +1,16 @@
 "use client";
 
-import { Suspense, useState, type ReactNode } from "react";
+import { Suspense, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BottomNav } from "@/components/bottom-nav";
+import { ExpensesList } from "@/components/expenses-list";
+import { BalancesPanel } from "@/components/balances-panel";
+import { SettleTab } from "@/components/settle-tab";
+import { useExpenses, useMembers, useRecorded, useSession } from "@/lib/queries";
+import { computeBalances, simplifyDebts } from "@/lib/settlements";
+
+type Tab = "expenses" | "balances" | "settle";
 
 function TabFallback() {
   return (
@@ -21,20 +28,76 @@ function TabFallback() {
   );
 }
 
-type Tab = "expenses" | "balances" | "settle";
+function useReady() {
+  const { data: session, isLoading } = useSession();
+  return { ready: !isLoading && !!session, loading: isLoading };
+}
+
+function ExpensesPane({ groupId, baseCurrency }: { groupId: string; baseCurrency: string }) {
+  const { ready, loading } = useReady();
+  const { data, isLoading } = useExpenses(groupId, baseCurrency, ready);
+  const { data: members } = useMembers(groupId, ready);
+  if (loading || isLoading || !data || !members) return <TabFallback />;
+  return <ExpensesList expenses={data.expenses} members={members} splitDetails={data.splitDetails} groupId={groupId} />;
+}
+
+function BalancesPane({ groupId, baseCurrency }: { groupId: string; baseCurrency: string }) {
+  const { ready, loading } = useReady();
+  const { data, isLoading } = useExpenses(groupId, baseCurrency, ready);
+  const { data: members, isLoading: membersLoading } = useMembers(groupId, ready);
+  const balances = useMemo(() => {
+    if (!data || !members) return null;
+    const memberIds = members.map((m) => m.id);
+    const paid = data.expenses.map((e) => ({ paidBy: e.paidBy, baseAmount: e.baseAmount }));
+    const splits = Object.values(data.splitDetails).flat().map((x) => ({ memberId: x.memberId, amountOwed: x.amount }));
+    return computeBalances(memberIds, paid, splits, baseCurrency);
+  }, [data, members, baseCurrency]);
+  if (loading || isLoading || membersLoading || !balances || !members) return <TabFallback />;
+  return <BalancesPanel balances={balances} members={members} />;
+}
+
+function SettlePane({ groupId, baseCurrency, simplify }: { groupId: string; baseCurrency: string; simplify: boolean }) {
+  const { ready, loading } = useReady();
+  const { data, isLoading } = useExpenses(groupId, baseCurrency, ready);
+  const { data: members, isLoading: membersLoading } = useMembers(groupId, ready);
+  const { data: recorded, isLoading: recordedLoading } = useRecorded(groupId, ready);
+  const { balances, settlements } = useMemo(() => {
+    if (!data || !members || !recorded) return { balances: null, settlements: null };
+    const memberIds = members.map((m) => m.id);
+    const paid = data.expenses.map((e) => ({ paidBy: e.paidBy, baseAmount: e.baseAmount }));
+    const splits = Object.values(data.splitDetails).flat().map((x) => ({ memberId: x.memberId, amountOwed: x.amount }));
+    const b = computeBalances(memberIds, paid, splits, baseCurrency);
+    for (const r of recorded) {
+      const from = b.find((x) => x.memberId === r.from);
+      const to = b.find((x) => x.memberId === r.to);
+      if (from) from.amount = Math.round((from.amount + r.amount) * 100) / 100;
+      if (to) to.amount = Math.round((to.amount - r.amount) * 100) / 100;
+    }
+    return { balances: b, settlements: simplify ? simplifyDebts(b, baseCurrency) : [] };
+  }, [data, members, recorded, baseCurrency, simplify]);
+  if (loading || isLoading || membersLoading || recordedLoading || !settlements || !recorded || !members) {
+    return <TabFallback />;
+  }
+  return <SettleTab groupId={groupId} settlements={settlements} recorded={recorded} members={members} />;
+}
 
 interface TripShellProps {
   tripId: string;
   tripName: string;
-  expensesPane: ReactNode;
-  balancesPane: ReactNode;
-  settlePane: ReactNode;
+  baseCurrency: string;
+  simplify: boolean;
 }
 
-export function TripShell({ tripId, tripName, expensesPane, balancesPane, settlePane }: TripShellProps) {
+export function TripShell({ tripId, tripName, baseCurrency, simplify }: TripShellProps) {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") as Tab) || "expenses";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+
+  const panes: Record<Tab, ReactNode> = {
+    expenses: <ExpensesPane groupId={tripId} baseCurrency={baseCurrency} />,
+    balances: <BalancesPane groupId={tripId} baseCurrency={baseCurrency} />,
+    settle: <SettlePane groupId={tripId} baseCurrency={baseCurrency} simplify={simplify} />,
+  };
 
   return (
     <div className="min-h-dvh bg-[var(--background)]">
@@ -78,15 +141,11 @@ export function TripShell({ tripId, tripName, expensesPane, balancesPane, settle
 
       {/* Content — panes stay mounted (hidden) so tab switches never refetch */}
       <main className="pb-[calc(4rem+var(--safe-bottom))]">
-        <div hidden={activeTab !== "expenses"}>
-          <Suspense fallback={<TabFallback />}>{expensesPane}</Suspense>
-        </div>
-        <div hidden={activeTab !== "balances"}>
-          <Suspense fallback={<TabFallback />}>{balancesPane}</Suspense>
-        </div>
-        <div hidden={activeTab !== "settle"}>
-          <Suspense fallback={<TabFallback />}>{settlePane}</Suspense>
-        </div>
+        {(Object.keys(panes) as Tab[]).map((tab) => (
+          <div key={tab} hidden={activeTab !== tab}>
+            <Suspense fallback={<TabFallback />}>{panes[tab]}</Suspense>
+          </div>
+        ))}
       </main>
 
       {/* FAB — Add Expense */}
