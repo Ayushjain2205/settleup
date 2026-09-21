@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Track group expenses, split bills, and settle up with friends.",
     start_url: "/",
     display: "standalone",
-    background_color: "#fafaf9",
+    background_color: "#7c3aed",
     theme_color: "#7c3aed",
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },

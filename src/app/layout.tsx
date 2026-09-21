@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { SwRegister } from "@/components/sw-register";
-import { BootSplash } from "@/components/boot-splash";
+import { SplashRemover } from "@/components/boot-splash";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -36,7 +36,30 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <BootSplash />
+        <div
+          id="app-splash"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: "#7c3aed",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            transition: "opacity 0.4s ease",
+            pointerEvents: "none",
+          }}
+        >
+          <span style={{ color: "#fff", fontSize: 72, fontWeight: 800, lineHeight: 1, fontFamily: "system-ui, sans-serif" }}>
+            S
+          </span>
+          <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 17, fontWeight: 600, fontFamily: "system-ui, sans-serif", letterSpacing: 0.5 }}>
+            SettleUp
+          </span>
+        </div>
+        <SplashRemover />
         <SwRegister />
         {children}
       </body>
