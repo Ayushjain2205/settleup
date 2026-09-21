@@ -50,8 +50,11 @@ export default async function GroupsPage() {
 
       <main className="pb-[calc(4rem+var(--safe-bottom))]">
         {/* Active groups */}
-        <div className="px-4 pt-4 pb-2">
+        <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Active</span>
+          <Link href="/join" className="text-[11px] font-semibold text-[var(--primary)]">
+            Join with code
+          </Link>
         </div>
 
         <div className="divide-y divide-[var(--border-color)]">

@@ -19,7 +19,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
 
   const { data: group } = await supabase
     .from("groups")
-    .select("id, name, base_currency, spend_currency, fx_mode, fixed_fx_rate, simplify_debts, created_by")
+    .select("id, name, base_currency, spend_currency, fx_mode, fixed_fx_rate, simplify_debts, created_by, join_code")
     .eq("id", id)
     .single();
 
@@ -49,6 +49,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
         fxMode: group.fx_mode,
         fixedFxRate: Number(group.fixed_fx_rate),
         createdBy: group.created_by,
+        joinCode: group.join_code,
       }}
       members={(memberRows || []).map((m) => ({ id: m.id, name: m.name, avatar: m.avatar, userId: m.user_id, email: m.email }))}
       currentUserId={user.id}

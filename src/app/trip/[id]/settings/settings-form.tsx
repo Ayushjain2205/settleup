@@ -13,6 +13,7 @@ interface SettingsFormProps {
     fxMode: string;
     fixedFxRate: number;
     createdBy: string | null;
+    joinCode: string;
   };
   members: { id: string; name: string; avatar: string; userId: string | null; email: string | null }[];
   currentUserId: string;
@@ -28,6 +29,7 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
   const [isEditingRate, setIsEditingRate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -65,6 +67,12 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
     }
     setIsEditingRate(false);
     updateGroup({ fixed_fx_rate: rate }, () => setFixedRate(group.fixedFxRate.toString()));
+  };
+
+  const handleCopyCode = async () => {
+    await navigator.clipboard.writeText(group.joinCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
   };
 
   const handleDelete = async () => {
@@ -167,6 +175,21 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
           {fxMode === "live" && (
             <p className="text-[11px] text-[var(--muted)]">Live rates aren&apos;t connected yet — expenses use a 1:1 rate for now.</p>
           )}
+        </div>
+
+        {/* Group code */}
+        <div className="px-4 py-3 bg-white border-b border-[var(--border-color)]">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="text-sm font-medium text-[var(--foreground)]">Group code</div>
+              <div className="text-[11px] text-[var(--muted)] mt-0.5">Share it so friends can join</div>
+            </div>
+            <button onClick={handleCopyCode} className="px-3 py-2 rounded-lg bg-[var(--primary)]/10 active:bg-[var(--primary)]/20 transition-colors">
+              <span className="text-sm font-bold tracking-[0.2em] text-[var(--primary)] tabular-nums">
+                {copiedCode ? "Copied!" : group.joinCode}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Members */}

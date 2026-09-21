@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { generateJoinCode } from "@/lib/join-code";
 import { StepIndicator } from "@/components/step-indicator";
 import { StepBasics } from "@/components/step-basics";
 import { StepCurrency } from "@/components/step-currency";
@@ -70,21 +71,31 @@ export default function GroupWizard() {
         return;
       }
 
-      const { data: group, error: groupError } = await supabase
-        .from("groups")
-        .insert({
-          name: formData.name.trim(),
-          type: formData.tripType,
-          base_currency: formData.baseCurrency,
-          spend_currency: formData.spendCurrency,
-          fx_mode: formData.fxMode,
-          fixed_fx_rate: formData.fixedFxRate,
-          simplify_debts: formData.simplifyDebts,
-          created_by: user.id,
-        })
-        .select("id")
-        .single();
-      if (groupError) throw groupError;
+      // Insert with a fresh code per attempt in case of collision
+      let group: { id: string } | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data, error } = await supabase
+          .from("groups")
+          .insert({
+            name: formData.name.trim(),
+            type: formData.tripType,
+            base_currency: formData.baseCurrency,
+            spend_currency: formData.spendCurrency,
+            fx_mode: formData.fxMode,
+            fixed_fx_rate: formData.fixedFxRate,
+            simplify_debts: formData.simplifyDebts,
+            join_code: generateJoinCode(),
+            created_by: user.id,
+          })
+          .select("id")
+          .single();
+        if (!error) {
+          group = data;
+          break;
+        }
+        if (error.code !== "23505" || attempt === 2) throw error;
+      }
+      if (!group) throw new Error("Could not create group");
 
       const displayName =
         (user.user_metadata?.display_name as string) ||
