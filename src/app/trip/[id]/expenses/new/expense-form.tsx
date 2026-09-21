@@ -172,7 +172,7 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
             .single();
       if (expenseError) throw expenseError;
 
-      const splits = computeSplits().map((s) => ({ expense_id: expense.id, ...s }));
+      const splits = computeSplits().map((s) => ({ expense_id: expense.id, member_id: s.memberId, amount_owed: s.amountOwed }));
       if (isEdit) {
         const { error: deleteError } = await supabase.from("expense_splits").delete().eq("expense_id", expense.id);
         if (deleteError) throw deleteError;
