@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { deleteExpense } from "@/lib/expenses";
 import { errorMessage } from "@/lib/error";
 import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
@@ -31,9 +32,9 @@ export function ExpenseDetail({ groupId, expense, members, splits, onClose }: Ex
     if (!window.confirm(`Delete "${expense.title}"? This can't be undone.`)) return;
     setIsDeleting(true);
     setError(null);
-    const { error } = await supabase.from("expenses").delete().eq("id", expense.id);
-    if (error) {
-      setError(errorMessage(error, "Could not delete expense"));
+    const message = await deleteExpense(supabase, expense.id);
+    if (message) {
+      setError(errorMessage(message, "Could not delete expense"));
       setIsDeleting(false);
       return;
     }

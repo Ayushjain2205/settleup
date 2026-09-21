@@ -1,9 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { deleteExpense } from "@/lib/expenses";
+import { success } from "@/lib/haptics";
+import { toast } from "@/components/toast";
 import type { Expense, Member } from "@/lib/mock-data";
 import { CATEGORIES } from "@/lib/categories";
 import { ExpenseDetail } from "./expense-detail";
+import { SwipeRow } from "./swipe-row";
 
 interface ExpensesListProps {
   expenses: Expense[];
@@ -35,7 +41,25 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
   const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
   const getMemberName = (id: string) => members.find((m) => m.id === id)?.name || id;
   const [openId, setOpenId] = useState<string | null>(null);
+  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const router = useRouter();
+  const supabase = createClient();
   const openExpense = openId ? expenses.find((e) => e.id === openId) || null : null;
+
+  const handleSwipeDelete = async (id: string) => {
+    setDeletingId(id);
+    const message = await deleteExpense(supabase, id);
+    setDeletingId(null);
+    setSwipeOpenId(null);
+    if (message) {
+      toast(message);
+      return;
+    }
+    success();
+    toast("Expense deleted");
+    router.refresh();
+  };
 
   const getIcon = (broad: string) => {
     const cat = BROAD_ICON[broad];
@@ -75,8 +99,19 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
               {dayExpenses.map((expense) => {
                 const cat = getIcon(expense.category);
                 const IconComp = cat.Icon;
+                const swipedOpen = swipeOpenId === expense.id;
                 return (
-                  <button key={expense.id} onClick={() => setOpenId(expense.id)} className="w-full list-item bg-white active:bg-[var(--background)] transition-colors text-left">
+                  <SwipeRow
+                    key={expense.id}
+                    id={expense.id}
+                    openId={swipeOpenId}
+                    onOpenChange={setSwipeOpenId}
+                    onDelete={handleSwipeDelete}
+                    deletingId={deletingId}
+                  >
+                    <div
+                      onClick={() => (swipedOpen ? setSwipeOpenId(null) : setOpenId(expense.id))}
+                      className="w-full list-item bg-white active:bg-[var(--background)] transition-colors text-left cursor-pointer">
                     <div className={`w-9 h-9 rounded-lg ${BROAD_COLOR[expense.category]} flex items-center justify-center flex-shrink-0`}>
                       <IconComp className="w-4 h-4" strokeWidth={1.5} />
                     </div>
@@ -89,7 +124,8 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
                     <div className="text-right flex-shrink-0">
                       <div className="text-sm font-semibold text-[var(--foreground)] tabular-nums">₹{expense.baseAmount.toLocaleString()}</div>
                     </div>
-                  </button>
+                    </div>
+                  </SwipeRow>
                 );
               })}
             </div>
