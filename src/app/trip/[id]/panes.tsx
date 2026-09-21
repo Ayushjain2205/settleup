@@ -65,7 +65,15 @@ export async function ExpensesPane({ groupId, baseCurrency }: { groupId: string;
     getMembers(supabase, groupId),
     getExpenses(supabase, groupId, baseCurrency),
   ]);
-  return <ExpensesList expenses={expenses} members={members} />;
+  const { data: splitRows } = await supabase
+    .from("expense_splits")
+    .select("expense_id, member_id, amount_owed, expenses!inner(group_id)")
+    .eq("expenses.group_id", groupId);
+  const splitDetails: Record<string, { memberId: string; amount: number }[]> = {};
+  for (const s of splitRows || []) {
+    (splitDetails[s.expense_id] ||= []).push({ memberId: s.member_id, amount: Number(s.amount_owed) });
+  }
+  return <ExpensesList expenses={expenses} members={members} splitDetails={splitDetails} groupId={groupId} />;
 }
 
 export async function BalancesPane({ groupId, baseCurrency }: { groupId: string; baseCurrency: string }) {

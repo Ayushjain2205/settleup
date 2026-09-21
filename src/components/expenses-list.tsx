@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import type { Expense, Member } from "@/lib/mock-data";
 import { CATEGORIES } from "@/lib/categories";
+import { ExpenseDetail } from "./expense-detail";
 
 interface ExpensesListProps {
   expenses: Expense[];
   members: Member[];
+  splitDetails: Record<string, { memberId: string; amount: number }[]>;
+  groupId: string;
 }
 
 const BROAD_ICON = Object.fromEntries(
@@ -21,7 +25,7 @@ const BROAD_COLOR: Record<string, string> = {
   other: "bg-stone-50 text-stone-600",
 };
 
-export function ExpensesList({ expenses, members }: ExpensesListProps) {
+export function ExpensesList({ expenses, members, splitDetails, groupId }: ExpensesListProps) {
   const groupedByDate = expenses.reduce((acc, expense) => {
     if (!acc[expense.date]) acc[expense.date] = [];
     acc[expense.date].push(expense);
@@ -30,6 +34,8 @@ export function ExpensesList({ expenses, members }: ExpensesListProps) {
 
   const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
   const getMemberName = (id: string) => members.find((m) => m.id === id)?.name || id;
+  const [openId, setOpenId] = useState<string | null>(null);
+  const openExpense = openId ? expenses.find((e) => e.id === openId) || null : null;
 
   const getIcon = (broad: string) => {
     const cat = BROAD_ICON[broad];
@@ -70,7 +76,7 @@ export function ExpensesList({ expenses, members }: ExpensesListProps) {
                 const cat = getIcon(expense.category);
                 const IconComp = cat.Icon;
                 return (
-                  <div key={expense.id} className="list-item bg-white active:bg-[var(--background)] transition-colors">
+                  <button key={expense.id} onClick={() => setOpenId(expense.id)} className="w-full list-item bg-white active:bg-[var(--background)] transition-colors text-left">
                     <div className={`w-9 h-9 rounded-lg ${BROAD_COLOR[expense.category]} flex items-center justify-center flex-shrink-0`}>
                       <IconComp className="w-4 h-4" strokeWidth={1.5} />
                     </div>
@@ -83,13 +89,22 @@ export function ExpensesList({ expenses, members }: ExpensesListProps) {
                     <div className="text-right flex-shrink-0">
                       <div className="text-sm font-semibold text-[var(--foreground)] tabular-nums">₹{expense.baseAmount.toLocaleString()}</div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </div>
         );
       })}
+      {openExpense && (
+        <ExpenseDetail
+          groupId={groupId}
+          expense={openExpense}
+          members={members}
+          splits={splitDetails[openExpense.id] || []}
+          onClose={() => setOpenId(null)}
+        />
+      )}
     </div>
   );
 }

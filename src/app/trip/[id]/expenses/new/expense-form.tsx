@@ -8,7 +8,7 @@ import { compressImage, mapScanToLines, type ScanResult } from "@/lib/scan";
 import { PayerPicker } from "@/components/payer-picker";
 import { SplitOptions, type SplitItem } from "@/components/split-options";
 import { CategoryPicker } from "@/components/category-picker";
-import { guessCategory, type Category } from "@/lib/categories";
+import { CATEGORIES, guessCategory, type Category } from "@/lib/categories";
 
 type SplitMode = "equal" | "exact" | "percent" | "itemized";
 
@@ -28,25 +28,42 @@ interface MemberInfo {
   avatar: string;
 }
 
-export function ExpenseForm({ group, members }: { group: GroupInfo; members: MemberInfo[] }) {
+export interface ExpenseInitial {
+  id: string;
+  title: string;
+  amount: string;
+  useBaseCurrency: boolean;
+  paidBy: string;
+  splitMode: SplitMode;
+  selectedMembers: string[];
+  exactAmounts: Record<string, string>;
+  percentages: Record<string, string>;
+  categoryId: string | null;
+  expenseDate: string;
+}
+
+export function ExpenseForm({ group, members, initial }: { group: GroupInfo; members: MemberInfo[]; initial?: ExpenseInitial }) {
   const router = useRouter();
   const dateRef = useRef<HTMLInputElement>(null);
+  const isEdit = !!initial;
 
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [paidBy, setPaidBy] = useState(members[0]?.id || "");
-  const [splitMode, setSplitMode] = useState<SplitMode>("equal");
-  const [selectedMembers, setSelectedMembers] = useState<string[]>(members.map((m) => m.id));
-  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>({});
-  const [percentages, setPercentages] = useState<Record<string, string>>({});
+  const [title, setTitle] = useState(initial?.title || "");
+  const [amount, setAmount] = useState(initial?.amount || "");
+  const [paidBy, setPaidBy] = useState(initial?.paidBy || members[0]?.id || "");
+  const [splitMode, setSplitMode] = useState<SplitMode>(initial?.splitMode || "equal");
+  const [selectedMembers, setSelectedMembers] = useState<string[]>(initial?.selectedMembers || members.map((m) => m.id));
+  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>(initial?.exactAmounts || {});
+  const [percentages, setPercentages] = useState<Record<string, string>>(initial?.percentages || {});
   const [items, setItems] = useState<SplitItem[]>([]);
   const [showPayerPicker, setShowPayerPicker] = useState(false);
   const [showSplitOptions, setShowSplitOptions] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [useBaseCurrency, setUseBaseCurrency] = useState(false);
-  const [category, setCategory] = useState<Category | null>(null);
+  const [expenseDate, setExpenseDate] = useState(initial?.expenseDate || (() => new Date().toISOString().split("T")[0]));
+  const [useBaseCurrency, setUseBaseCurrency] = useState(initial?.useBaseCurrency || false);
+  const [category, setCategory] = useState<Category | null>(
+    () => (initial?.categoryId ? CATEGORIES.find((c) => c.id === initial.categoryId) || null : null)
+  );
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanStage, setScanStage] = useState(0);
@@ -55,8 +72,9 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
 
   const SCAN_STAGES = ["Uploading receipt…", "Reading receipt…", "Extracting items…"];
 
-  // Smart auto-categorization: guess category from description
+  // Smart auto-categorization: guess category from description (create only)
   useEffect(() => {
+    if (isEdit) return;
     if (title.trim()) {
       const guessed = guessCategory(title);
       if (guessed && guessed.id !== category?.id) {
@@ -119,29 +137,51 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
         return;
       }
 
-      const { data: expense, error: expenseError } = await supabase
-        .from("expenses")
-        .insert({
-          group_id: group.id,
-          title: title.trim(),
-          amount: amountNum,
-          currency,
-          base_amount: Math.round(baseAmount * 100) / 100,
-          category_id: category?.id || "other",
-          paid_by: paidBy,
-          split_mode: splitMode,
-          expense_date: expenseDate,
-          created_by: user.id,
-        })
-        .select("id")
-        .single();
+      const { data: expense, error: expenseError } = isEdit
+        ? await supabase
+            .from("expenses")
+            .update({
+              title: title.trim(),
+              amount: amountNum,
+              currency,
+              base_amount: Math.round(baseAmount * 100) / 100,
+              category_id: category?.id || "other",
+              paid_by: paidBy,
+              split_mode: splitMode,
+              expense_date: expenseDate,
+            })
+            .eq("id", initial.id)
+            .select("id")
+            .single()
+        : await supabase
+            .from("expenses")
+            .insert({
+              group_id: group.id,
+              title: title.trim(),
+              amount: amountNum,
+              currency,
+              base_amount: Math.round(baseAmount * 100) / 100,
+              category_id: category?.id || "other",
+              paid_by: paidBy,
+              split_mode: splitMode,
+              expense_date: expenseDate,
+              created_by: user.id,
+            })
+            .select("id")
+            .single();
       if (expenseError) throw expenseError;
 
       const splits = computeSplits().map((s) => ({ expense_id: expense.id, ...s }));
+      if (isEdit) {
+        const { error: deleteError } = await supabase.from("expense_splits").delete().eq("expense_id", expense.id);
+        if (deleteError) throw deleteError;
+      }
       const { error: splitsError } = await supabase.from("expense_splits").insert(splits);
       if (splitsError) {
-        // Best-effort rollback so we never leave a split-less expense
-        await supabase.from("expenses").delete().eq("id", expense.id);
+        if (!isEdit) {
+          // Best-effort rollback so we never leave a split-less expense
+          await supabase.from("expenses").delete().eq("id", expense.id);
+        }
         throw splitsError;
       }
 
@@ -210,7 +250,7 @@ export function ExpenseForm({ group, members }: { group: GroupInfo; members: Mem
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-          <span className="flex-1 text-center text-[15px] font-semibold text-[var(--foreground)]">Add an expense</span>
+          <span className="flex-1 text-center text-[15px] font-semibold text-[var(--foreground)]">{isEdit ? "Edit expense" : "Add an expense"}</span>
           <button onClick={handleSubmit} disabled={!canSubmit || isSubmitting} className="text-sm font-bold text-[var(--primary)] disabled:opacity-40">
             Save
           </button>
