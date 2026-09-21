@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/error";
 import { computeSplitOwes } from "@/lib/splits";
 import { compressImage, mapScanToLines, type ScanResult } from "@/lib/scan";
 import { PayerPicker } from "@/components/payer-picker";
@@ -187,7 +188,7 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
 
       router.push(`/trip/${group.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save expense");
+      setError(errorMessage(err, "Could not save expense"));
     } finally {
       setIsSubmitting(false);
     }
@@ -225,7 +226,7 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
         setSplitMode("itemized");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not read receipt");
+      setError(errorMessage(err, "Could not read receipt"));
     } finally {
       if (scanTimer.current) clearInterval(scanTimer.current);
       setIsScanning(false);

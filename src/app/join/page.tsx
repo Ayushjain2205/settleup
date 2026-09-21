@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/error";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/join-code";
 
 export default function JoinPage() {
@@ -30,7 +31,7 @@ export default function JoinPage() {
       if (error) throw error;
       router.push(`/trip/${data}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not join group");
+      setError(errorMessage(err, "Could not join group"));
     } finally {
       setIsJoining(false);
     }

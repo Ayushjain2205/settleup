@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/error";
 import { generateJoinCode } from "@/lib/join-code";
 import { StepIndicator } from "@/components/step-indicator";
 import { StepBasics } from "@/components/step-basics";
@@ -113,7 +114,7 @@ export default function GroupWizard() {
       setCreatedGroupId(group.id);
       setIsSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create group");
+      setError(errorMessage(err, "Could not create group"));
     } finally {
       setIsSubmitting(false);
     }

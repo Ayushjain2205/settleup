@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/error";
 import type { Settlement, Member } from "@/lib/mock-data";
 
 export interface RecordedPayment {
@@ -51,7 +52,7 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
       if (error) throw error;
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not record payment");
+      setError(errorMessage(err, "Could not record payment"));
     } finally {
       setRecording(null);
     }
