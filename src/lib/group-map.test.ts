@@ -24,6 +24,7 @@ describe("mapGroupRows", () => {
         members: [{ id: "m1", avatar: "Y" }],
         totalSpent: 150.5,
         lastDate: "2026-03-18",
+        position: null,
       },
     ]);
   });
@@ -32,7 +33,7 @@ describe("mapGroupRows", () => {
     expect(
       mapGroupRows([{ id: "g2", name: "Empty", base_currency: "MYR", group_members: null, expenses: null }])
     ).toEqual([
-      { id: "g2", name: "Empty", baseCurrency: "MYR", members: [], totalSpent: 0, lastDate: null },
+      { id: "g2", name: "Empty", baseCurrency: "MYR", members: [], totalSpent: 0, lastDate: null, position: null },
     ]);
   });
 
