@@ -2,6 +2,8 @@
 
 import type { Balance, Member } from "@/lib/mock-data";
 
+const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
+
 interface BalancesPanelProps {
   balances: Balance[];
   members: Member[];
@@ -47,7 +49,7 @@ export function BalancesPanel({ balances, members }: BalancesPanelProps) {
                 </div>
               </div>
               <div className={`text-sm font-semibold flex-shrink-0 tabular-nums ${isPositive ? "text-[var(--success)]" : "text-[var(--error)]"}`}>
-                {isPositive ? "+" : ""}₹{balance.amount.toLocaleString()}
+                {isPositive ? "+" : ""}{symbol(balance.currency)}{balance.amount.toLocaleString()}
               </div>
             </div>
           );

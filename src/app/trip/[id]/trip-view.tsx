@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BottomNav } from "@/components/bottom-nav";
@@ -33,70 +33,123 @@ function useReady() {
   return { ready: !isLoading && !!session, loading: isLoading };
 }
 
-function ExpensesPane({ groupId, baseCurrency }: { groupId: string; baseCurrency: string }) {
-  const { ready, loading } = useReady();
-  const { data, isLoading } = useExpenses(groupId, baseCurrency, ready);
-  const { data: members } = useMembers(groupId, ready);
-  if (loading || isLoading || !data || !members) return <TabFallback />;
-  return <ExpensesList expenses={data.expenses} members={members} splitDetails={data.splitDetails} groupId={groupId} />;
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
+interface DisplayCtx {
+  code: string;
+  baseCurrency: string;
+  spendCurrency: string;
+  fxRate: number;
+  /** Convert a base-currency value to the display currency. */
+  show: (base: number) => number;
 }
 
-function BalancesPane({ groupId, baseCurrency }: { groupId: string; baseCurrency: string }) {
+function ExpensesPane({ groupId, display }: { groupId: string; display: DisplayCtx }) {
   const { ready, loading } = useReady();
-  const { data, isLoading } = useExpenses(groupId, baseCurrency, ready);
+  const { data, isLoading } = useExpenses(groupId, display.baseCurrency, ready);
+  const { data: members } = useMembers(groupId, ready);
+  const shown = useMemo(() => {
+    if (!data) return null;
+    if (display.code === display.baseCurrency) return data;
+    return {
+      ...data,
+      expenses: data.expenses.map((e) => ({ ...e, baseAmount: e.amount, baseCurrency: display.code })),
+    };
+  }, [data, display]);
+  if (loading || isLoading || !shown || !members) return <TabFallback />;
+  return <ExpensesList expenses={shown.expenses} members={members} splitDetails={shown.splitDetails} groupId={groupId} />;
+}
+
+function BalancesPane({ groupId, display }: { groupId: string; display: DisplayCtx }) {
+  const { ready, loading } = useReady();
+  const { data, isLoading } = useExpenses(groupId, display.baseCurrency, ready);
   const { data: members, isLoading: membersLoading } = useMembers(groupId, ready);
   const balances = useMemo(() => {
     if (!data || !members) return null;
     const memberIds = members.map((m) => m.id);
     const paid = data.expenses.map((e) => ({ paidBy: e.paidBy, baseAmount: e.baseAmount }));
     const splits = Object.values(data.splitDetails).flat().map((x) => ({ memberId: x.memberId, amountOwed: x.amount }));
-    return computeBalances(memberIds, paid, splits, baseCurrency);
-  }, [data, members, baseCurrency]);
+    return computeBalances(memberIds, paid, splits, display.baseCurrency).map((b) => ({
+      ...b,
+      amount: display.show(b.amount),
+      currency: display.code,
+    }));
+  }, [data, members, display]);
   if (loading || isLoading || membersLoading || !balances || !members) return <TabFallback />;
   return <BalancesPanel balances={balances} members={members} />;
 }
 
-function SettlePane({ groupId, baseCurrency, simplify }: { groupId: string; baseCurrency: string; simplify: boolean }) {
+function SettlePane({ groupId, display, simplify }: { groupId: string; display: DisplayCtx; simplify: boolean }) {
   const { ready, loading } = useReady();
-  const { data, isLoading } = useExpenses(groupId, baseCurrency, ready);
+  const { data, isLoading } = useExpenses(groupId, display.baseCurrency, ready);
   const { data: members, isLoading: membersLoading } = useMembers(groupId, ready);
   const { data: recorded, isLoading: recordedLoading } = useRecorded(groupId, ready);
-  const { balances, settlements } = useMemo(() => {
-    if (!data || !members || !recorded) return { balances: null, settlements: null };
+  const { settlements, shownRecorded } = useMemo(() => {
+    if (!data || !members || !recorded) return { balances: null, settlements: null, shownRecorded: null };
     const memberIds = members.map((m) => m.id);
     const paid = data.expenses.map((e) => ({ paidBy: e.paidBy, baseAmount: e.baseAmount }));
     const splits = Object.values(data.splitDetails).flat().map((x) => ({ memberId: x.memberId, amountOwed: x.amount }));
-    const b = computeBalances(memberIds, paid, splits, baseCurrency);
+    const b = computeBalances(memberIds, paid, splits, display.baseCurrency);
     for (const r of recorded) {
       const from = b.find((x) => x.memberId === r.from);
       const to = b.find((x) => x.memberId === r.to);
       if (from) from.amount = Math.round((from.amount + r.amount) * 100) / 100;
       if (to) to.amount = Math.round((to.amount - r.amount) * 100) / 100;
     }
-    return { balances: b, settlements: simplify ? simplifyDebts(b, baseCurrency) : [] };
-  }, [data, members, recorded, baseCurrency, simplify]);
-  if (loading || isLoading || membersLoading || recordedLoading || !settlements || !recorded || !members) {
+    const plan = simplify ? simplifyDebts(b, display.baseCurrency) : [];
+    const show = (v: number) => display.show(v);
+    return {
+      balances: b,
+      settlements: plan.map((s) => ({ ...s, amount: show(s.amount), currency: display.code })),
+      shownRecorded: recorded.map((r) => ({ ...r, amount: show(r.amount), currency: display.code })),
+    };
+  }, [data, members, recorded, display, simplify]);
+  if (loading || isLoading || membersLoading || recordedLoading || !settlements || !shownRecorded || !members) {
     return <TabFallback />;
   }
-  return <SettleTab groupId={groupId} settlements={settlements} recorded={recorded} members={members} />;
+  return <SettleTab groupId={groupId} settlements={settlements} recorded={shownRecorded} members={members} />;
 }
 
 interface TripShellProps {
   tripId: string;
   tripName: string;
   baseCurrency: string;
+  spendCurrency: string;
+  fxRate: number;
   simplify: boolean;
 }
 
-export function TripShell({ tripId, tripName, baseCurrency, simplify }: TripShellProps) {
+export function TripShell({ tripId, tripName, baseCurrency, spendCurrency, fxRate, simplify }: TripShellProps) {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") as Tab) || "expenses";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
+  const storageKey = `settleup-display-currency-${tripId}`;
+  const [displayCode, setDisplayCode] = useState(() => {
+    if (typeof window === "undefined") return spendCurrency;
+    return window.localStorage.getItem(storageKey) || spendCurrency;
+  });
+  useEffect(() => {
+    window.localStorage.setItem(storageKey, displayCode);
+  }, [storageKey, displayCode]);
+
+  const display: DisplayCtx = useMemo(
+    () => ({
+      code: displayCode,
+      baseCurrency,
+      spendCurrency,
+      fxRate,
+      show: (base: number) => (displayCode === baseCurrency ? base : round2(base / (fxRate || 1))),
+    }),
+    [displayCode, baseCurrency, spendCurrency, fxRate]
+  );
+
+  const multiCurrency = baseCurrency !== spendCurrency;
+
   const panes: Record<Tab, ReactNode> = {
-    expenses: <ExpensesPane groupId={tripId} baseCurrency={baseCurrency} />,
-    balances: <BalancesPane groupId={tripId} baseCurrency={baseCurrency} />,
-    settle: <SettlePane groupId={tripId} baseCurrency={baseCurrency} simplify={simplify} />,
+    expenses: <ExpensesPane groupId={tripId} display={display} />,
+    balances: <BalancesPane groupId={tripId} display={display} />,
+    settle: <SettlePane groupId={tripId} display={display} simplify={simplify} />,
   };
 
   return (
@@ -137,6 +190,24 @@ export function TripShell({ tripId, tripName, baseCurrency, simplify }: TripShel
             </button>
           ))}
         </div>
+
+        {/* Display currency — spend vs settle */}
+        {multiCurrency && (
+          <div className="flex items-center justify-center gap-1 px-4 py-2 bg-white border-b border-[var(--border-color)]">
+            <span className="text-[10px] text-[var(--muted)] mr-1">Showing in</span>
+            {[spendCurrency, baseCurrency].map((c) => (
+              <button
+                key={c}
+                onClick={() => setDisplayCode(c)}
+                className={`px-3 py-1 rounded-md text-[11px] font-bold transition-colors ${
+                  displayCode === c ? "bg-[var(--primary)] text-white" : "text-[var(--muted)]"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* Content — panes stay mounted (hidden) so tab switches never refetch */}

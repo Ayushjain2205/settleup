@@ -10,6 +10,8 @@ import { CATEGORIES } from "@/lib/categories";
 import { ExpenseDetail } from "./expense-detail";
 import { SwipeRow } from "./swipe-row";
 
+const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
+
 interface ExpensesListProps {
   expenses: Expense[];
   members: Member[];
@@ -92,7 +94,7 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
               <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">
                 {new Date(date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
               </span>
-              <span className="text-[11px] font-semibold text-[var(--muted)] tabular-nums">₹{dayTotal.toLocaleString()}</span>
+              <span className="text-[11px] font-semibold text-[var(--muted)] tabular-nums">{dayExpenses.length > 0 ? `${symbol(dayExpenses[0].baseCurrency)}${dayTotal.toLocaleString()}` : ""}</span>
             </div>
 
             <div className="divide-y divide-[var(--border-color)]">
@@ -122,7 +124,7 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <div className="text-sm font-semibold text-[var(--foreground)] tabular-nums">₹{expense.baseAmount.toLocaleString()}</div>
+                      <div className="text-sm font-semibold text-[var(--foreground)] tabular-nums">{symbol(expense.baseCurrency)}{expense.baseAmount.toLocaleString()}</div>
                     </div>
                     </div>
                   </SwipeRow>

@@ -9,7 +9,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     supabase.auth.getUser(),
     supabase
       .from("groups")
-      .select("id, name, base_currency, simplify_debts")
+      .select("id, name, base_currency, spend_currency, fixed_fx_rate, simplify_debts")
       .eq("id", id)
       .single(),
   ]);
@@ -52,6 +52,8 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       tripId={group.id}
       tripName={group.name}
       baseCurrency={group.base_currency}
+      spendCurrency={group.spend_currency}
+      fxRate={Number(group.fixed_fx_rate) || 1}
       simplify={group.simplify_debts}
     />
   );
