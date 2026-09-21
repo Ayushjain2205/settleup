@@ -11,7 +11,15 @@ function broadOf(categoryId: string): Expense["category"] {
 export default async function TripPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+
+  const [{ data: { user } }, { data: group }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from("groups")
+      .select("id, name, base_currency, spend_currency, fx_mode, fixed_fx_rate, simplify_debts")
+      .eq("id", id)
+      .single(),
+  ]);
 
   if (!user) {
     return (
@@ -23,12 +31,6 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       </div>
     );
   }
-
-  const { data: group } = await supabase
-    .from("groups")
-    .select("id, name, base_currency, spend_currency, fx_mode, fixed_fx_rate, simplify_debts")
-    .eq("id", id)
-    .single();
 
   // Claim any email invite waiting for this user, then proceed as a member
   if (group && user.email) {
@@ -52,6 +54,16 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     );
   }
 
+  // Claim invite first — awaited alongside the reads so they see membership
+  if (user.email) {
+    await supabase
+      .from("group_members")
+      .update({ user_id: user.id })
+      .is("user_id", null)
+      .eq("group_id", id)
+      .eq("email", user.email);
+  }
+
   const [{ data: memberRows }, { data: expenseRows }, { data: splitRows }, { data: recordedRows }] = await Promise.all([
     supabase.from("group_members").select("id, name, avatar, upi_id").eq("group_id", id),
     supabase
@@ -61,8 +73,8 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       .order("expense_date", { ascending: false }),
     supabase
       .from("expense_splits")
-      .select("expense_id, member_id, amount_owed")
-      .in("expense_id", (await supabase.from("expenses").select("id").eq("group_id", id)).data?.map((e) => e.id) || ["00000000-0000-0000-0000-000000000000"]),
+      .select("expense_id, member_id, amount_owed, expenses!inner(group_id)")
+      .eq("expenses.group_id", id),
     supabase
       .from("settlements")
       .select("from_member, to_member, amount, currency, created_at")

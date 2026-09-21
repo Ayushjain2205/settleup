@@ -4,7 +4,19 @@ import { ExpenseForm } from "./expense-form";
 export default async function AddExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+
+  const [{ data: { user } }, { data: group }, { data: memberRows }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from("groups")
+      .select("id, name, base_currency, spend_currency, fixed_fx_rate")
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("group_members")
+      .select("id, name, avatar")
+      .eq("group_id", id),
+  ]);
 
   if (!user) {
     return (
@@ -17,12 +29,6 @@ export default async function AddExpensePage({ params }: { params: Promise<{ id:
     );
   }
 
-  const { data: group } = await supabase
-    .from("groups")
-    .select("id, name, base_currency, spend_currency, fixed_fx_rate")
-    .eq("id", id)
-    .single();
-
   if (!group) {
     return (
       <div className="min-h-screen bg-[var(--background)] flex flex-col items-center justify-center px-6">
@@ -33,11 +39,6 @@ export default async function AddExpensePage({ params }: { params: Promise<{ id:
       </div>
     );
   }
-
-  const { data: memberRows } = await supabase
-    .from("group_members")
-    .select("id, name, avatar")
-    .eq("group_id", id);
 
   return (
     <ExpenseForm

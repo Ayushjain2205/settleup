@@ -25,7 +25,9 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  // Session refresh only — getSession reads cookies locally (no network).
+  // Pages verify the user with getUser() when they actually need it.
+  await supabase.auth.getSession();
 
   return supabaseResponse;
 }
