@@ -3,8 +3,54 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useGroups, useSession, symbol } from "@/lib/queries";
+import { useGroups, useSession, symbol, type GroupListItem } from "@/lib/queries";
 import { BottomNav } from "@/components/bottom-nav";
+
+function Overall({ trips }: { trips: GroupListItem[] }) {
+  const currencies = [...new Set(trips.map((t) => t.baseCurrency))];
+  const nets = trips.map((t) => t.position?.net || 0);
+  const active = nets.filter((n) => Math.abs(n) >= 0.01);
+
+  if (currencies.length === 1 && active.length > 0) {
+    const net = nets.reduce((a, b) => a + b, 0);
+    const c = currencies[0];
+    if (Math.abs(net) < 0.01) {
+      return (
+        <div className="px-4 pt-4 pb-1">
+          <p className="text-[15px] font-semibold text-[var(--muted)]">Overall, all settled up</p>
+        </div>
+      );
+    }
+    const owed = net > 0;
+    return (
+      <div className="px-4 pt-4 pb-1">
+        <p className="text-[15px] font-semibold text-[var(--foreground)]">
+          Overall, you {owed ? "are owed" : "owe"}{" "}
+          <span className={`tabular-nums ${owed ? "text-[var(--success)]" : "text-[var(--error)]"}`}>
+            {symbol(c)}{Math.abs(net).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </span>
+        </p>
+      </div>
+    );
+  }
+
+  const oweCount = nets.filter((n) => n < -0.009).length;
+  const owedCount = nets.filter((n) => n > 0.009).length;
+  if (oweCount === 0 && owedCount === 0) {
+    return (
+      <div className="px-4 pt-4 pb-1">
+        <p className="text-[15px] font-semibold text-[var(--muted)]">Overall, all settled up</p>
+      </div>
+    );
+  }
+  return (
+    <div className="px-4 pt-4 pb-1">
+      <p className="text-[15px] font-semibold text-[var(--foreground)]">
+        Overall{oweCount > 0 ? `, you owe in ${oweCount}` : ""}{oweCount > 0 && owedCount > 0 ? " · " : ""}{owedCount > 0 ? `owed in ${owedCount}` : ""}
+      </p>
+    </div>
+  );
+}
 
 function GroupsSkeleton() {
   return (
@@ -65,6 +111,9 @@ export default function GroupsPage() {
       </header>
 
       <main className="pb-[calc(4rem+var(--safe-bottom))]">
+        {/* Overall position */}
+        {!tripsLoading && (trips || []).length > 0 && <Overall trips={trips || []} />}
+
         {/* Active groups */}
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Active</span>
@@ -77,7 +126,13 @@ export default function GroupsPage() {
           <GroupsSkeleton />
         ) : (
           <div className="divide-y divide-[var(--border-color)]">
-            {(trips || []).map((trip) => (
+            {(trips || []).map((trip) => {
+              const net = trip.position?.net || 0;
+              const owes = net < -0.009;
+              const owed = net > 0.009;
+              const counterparty = owes ? trip.position?.iOwe[0] : trip.position?.owesMe[0];
+              const extra = (owes ? trip.position?.iOwe.length || 0 : trip.position?.owesMe.length || 0) - 1;
+              return (
               <Link
                 key={trip.id}
                 href={`/trip/${trip.id}`}
@@ -92,34 +147,38 @@ export default function GroupsPage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-2">
                       <span className="text-sm font-semibold text-[var(--foreground)] truncate">{trip.name}</span>
-                      <span className="text-sm font-bold text-[var(--foreground)] tabular-nums">{symbol(trip.baseCurrency)}{trip.totalSpent.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <div className="flex items-center gap-1.5">
-                        {/* Member avatars */}
-                        <div className="flex -space-x-1.5">
-                          {trip.members.slice(0, 3).map((m) => (
-                            <div key={m.id} className="w-4 h-4 rounded-full bg-[var(--foreground)] border border-white flex items-center justify-center text-[6px] font-bold text-white">
-                              {m.avatar}
-                            </div>
-                          ))}
-                        </div>
-                        <span className="text-[11px] text-[var(--muted)]">
-                          {trip.members.length} members
-                        </span>
-                      </div>
-                      {trip.lastDate && (
-                        <span className="text-[10px] text-[var(--muted)]">
-                          {new Date(trip.lastDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      {owes && (
+                        <span className="text-right flex-shrink-0">
+                          <span className="block text-[10px] text-[var(--error)]">you owe</span>
+                          <span className="block text-sm font-bold text-[var(--error)] tabular-nums">{symbol(trip.baseCurrency)}{Math.abs(net).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                         </span>
                       )}
+                      {owed && (
+                        <span className="text-right flex-shrink-0">
+                          <span className="block text-[10px] text-[var(--success)]">you are owed</span>
+                          <span className="block text-sm font-bold text-[var(--success)] tabular-nums">{symbol(trip.baseCurrency)}{net.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                        </span>
+                      )}
+                      {!owes && !owed && (
+                        <span className="text-[11px] text-[var(--muted)] flex-shrink-0">settled up</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-[var(--muted)] mt-0.5 truncate">
+                      {owes && counterparty && (
+                        <>You owe {counterparty.name} {symbol(trip.baseCurrency)}{counterparty.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}{extra > 0 ? ` +${extra} other${extra > 1 ? "s" : ""}` : ""}</>
+                      )}
+                      {owed && counterparty && (
+                        <>{counterparty.name} owes you {symbol(trip.baseCurrency)}{counterparty.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}{extra > 0 ? ` +${extra} other${extra > 1 ? "s" : ""}` : ""}</>
+                      )}
+                      {!owes && !owed && <>{trip.members.length} members</>}
                     </div>
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         )}
 

@@ -25,6 +25,7 @@ export function mapGroupRows(rows: GroupRow[]): GroupListItem[] {
       members: g.group_members || [],
       totalSpent,
       lastDate,
+      position: null,
     };
   });
 }

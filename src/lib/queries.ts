@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase/browser";
 import { CATEGORIES } from "@/lib/categories";
 import { mapGroupRows } from "@/lib/group-map";
 import { buildFeed } from "@/lib/feed";
+import { computePosition, type Position } from "@/lib/position";
 import type { Expense, Member } from "@/lib/mock-data";
 
 export function useSession() {
@@ -29,6 +30,7 @@ export interface GroupListItem {
   members: { id: string; avatar: string }[];
   totalSpent: number;
   lastDate: string | null;
+  position: Position | null;
 }
 
 export interface TripMeta {
@@ -69,15 +71,48 @@ export { symbol };
 
 export function useGroups() {
   const { data: session, isLoading: sessionLoading } = useSession();
+  const userId = session?.user.id;
   return useQuery({
     queryKey: ["groups"],
     queryFn: async (): Promise<GroupListItem[]> => {
       const { data: groups, error } = await supabase
         .from("groups")
-        .select("id, name, base_currency, group_members(id, avatar), expenses(base_amount, expense_date)")
+        .select("id, name, base_currency, simplify_debts, group_members(id, name, avatar, user_id), expenses(id, base_amount, expense_date, paid_by)")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return mapGroupRows(groups || []);
+      const ids = (groups || []).map((g) => g.id);
+      let splitRows: { expense_id: string; member_id: string; amount_owed: string | number }[] = [];
+      if (ids.length > 0) {
+        const { data, error: splitError } = await supabase
+          .from("expense_splits")
+          .select("expense_id, member_id, amount_owed, expenses!inner(group_id)")
+          .in("expenses.group_id", ids);
+        if (splitError) throw splitError;
+        splitRows = data || [];
+      }
+      const splitsByExpense = new Map<string, { memberId: string; amountOwed: number }[]>();
+      for (const s of splitRows) {
+        const arr = splitsByExpense.get(s.expense_id) || [];
+        arr.push({ memberId: s.member_id, amountOwed: Number(s.amount_owed) });
+        splitsByExpense.set(s.expense_id, arr);
+      }
+      return mapGroupRows(groups || []).map((g, i) => {
+        const raw = (groups || [])[i];
+        const expenses = raw.expenses || [];
+        return {
+          ...g,
+          position: computePosition(
+            {
+              members: (raw.group_members || []).map((m) => ({ id: m.id, userId: m.user_id, name: m.name })),
+              expenses: expenses.map((e) => ({ paidBy: e.paid_by, baseAmount: Number(e.base_amount) })),
+              splits: expenses.flatMap((e) => splitsByExpense.get(e.id) || []),
+              simplify: raw.simplify_debts,
+              currency: g.baseCurrency,
+              currentUserId: userId || "",
+            }
+          ),
+        };
+      });
     },
     enabled: !!session,
   });
