@@ -8,7 +8,7 @@ export default async function LandingPage() {
   if (user) redirect("/");
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-dvh bg-[var(--background)]">
       <nav className="flex items-center justify-between px-5 py-4">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[var(--primary)] flex items-center justify-center">

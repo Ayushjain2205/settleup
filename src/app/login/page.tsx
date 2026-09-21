@@ -55,7 +55,7 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] flex flex-col px-6 pt-16 pb-8">
+    <div className="min-h-dvh bg-[var(--background)] flex flex-col px-6 pt-16 pb-8">
       <div className="w-12 h-12 rounded-2xl bg-[var(--primary)] flex items-center justify-center mb-6">
         <span className="text-white text-xl font-bold">S</span>
       </div>

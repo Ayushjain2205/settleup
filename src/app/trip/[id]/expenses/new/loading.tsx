@@ -1,6 +1,6 @@
 export default function ExpenseLoading() {
   return (
-    <div className="min-h-screen bg-[var(--background)] flex flex-col animate-pulse">
+    <div className="min-h-dvh bg-[var(--background)] flex flex-col animate-pulse">
       <header className="sticky top-0 z-40 bg-white/80 border-b border-[var(--border-color)]">
         <div className="flex items-center h-14 px-4">
           <div className="w-5 h-5 rounded bg-[var(--border-color)] mr-3" />

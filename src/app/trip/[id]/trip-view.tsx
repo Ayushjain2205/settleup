@@ -37,7 +37,7 @@ export function TripShell({ tripId, tripName, expensesPane, balancesPane, settle
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-dvh bg-[var(--background)]">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[var(--border-color)]">
         <div className="flex items-center h-14 px-4">

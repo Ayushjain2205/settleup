@@ -20,7 +20,7 @@ export default async function AddExpensePage({ params }: { params: Promise<{ id:
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[var(--background)] flex flex-col items-center justify-center px-6">
+      <div className="min-h-dvh bg-[var(--background)] flex flex-col items-center justify-center px-6">
         <p className="text-sm font-medium text-[var(--foreground)]">Sign in to add an expense</p>
         <a href="/login" className="mt-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-semibold">
           Sign in
@@ -31,7 +31,7 @@ export default async function AddExpensePage({ params }: { params: Promise<{ id:
 
   if (!group) {
     return (
-      <div className="min-h-screen bg-[var(--background)] flex flex-col items-center justify-center px-6">
+      <div className="min-h-dvh bg-[var(--background)] flex flex-col items-center justify-center px-6">
         <p className="text-sm font-medium text-[var(--foreground)]">Group not found</p>
         <a href="/" className="mt-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-semibold">
           Back to groups

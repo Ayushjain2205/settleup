@@ -110,7 +110,7 @@ export default function GroupWizard() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-6">
+      <div className="min-h-dvh flex items-center justify-center bg-[var(--background)] px-6">
         <div className="text-center">
           <div className="w-16 h-16 rounded-full bg-[var(--success)] flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -131,7 +131,7 @@ export default function GroupWizard() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-dvh bg-[var(--background)]">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[var(--border-color)]">
         <div className="flex items-center h-14 px-4">
