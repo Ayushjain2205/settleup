@@ -28,7 +28,7 @@ export function Toaster() {
       {items.map((t) => (
         <div
           key={t.id}
-          className="px-4 py-2.5 rounded-full bg-[var(--foreground)] text-[var(--background)] text-xs font-semibold shadow-lg"
+          className="toast-in px-4 py-2.5 rounded-full bg-[var(--foreground)] text-[var(--background)] text-xs font-semibold shadow-lg"
         >
           {t.msg}
         </div>

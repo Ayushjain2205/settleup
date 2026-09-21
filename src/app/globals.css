@@ -91,5 +91,13 @@ input:focus, textarea:focus, select:focus {
 }
 .fab:active { transform: scale(0.92); }
 
+/* Toast entrance — springy pop as a haptic stand-in on iOS */
+@keyframes toast-in {
+  0% { opacity: 0; transform: scale(0.85) translateY(8px); }
+  60% { opacity: 1; transform: scale(1.03) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.toast-in { animation: toast-in 0.25s ease-out; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 0; height: 0; }
