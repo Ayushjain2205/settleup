@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
-import { tick } from "@/lib/haptics";
+import { success, failure } from "@/lib/haptics";
 import { toast } from "@/components/toast";
 import { computeSplitOwes } from "@/lib/splits";
 import { compressImage, mapScanToLines, type ScanResult } from "@/lib/scan";
@@ -158,7 +158,7 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
 
       router.push(`/trip/${group.id}`);
       router.refresh();
-      tick();
+      success();
       toast(isEdit ? "Expense updated" : "Expense added");
     } catch (err) {
       setError(errorMessage(err, "Could not save expense"));
@@ -198,8 +198,10 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
         setItems(lines);
         setSplitMode("itemized");
       }
+      success();
     } catch (err) {
       setError(errorMessage(err, "Could not read receipt"));
+      failure();
     } finally {
       if (scanTimer.current) clearInterval(scanTimer.current);
       setIsScanning(false);

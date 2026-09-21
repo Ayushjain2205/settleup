@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
-import { tick } from "@/lib/haptics";
+import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
 import type { Expense, Member } from "@/lib/mock-data";
 
@@ -39,7 +39,7 @@ export function ExpenseDetail({ groupId, expense, members, splits, onClose }: Ex
     }
     onClose();
     router.refresh();
-    tick();
+    success();
     toast("Expense deleted");
   };
 
