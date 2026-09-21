@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { SwRegister } from "@/components/sw-register";
 import { BootSplash } from "@/components/boot-splash";
+import { Toaster } from "@/components/toast";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <BootSplash />
         <SwRegister />
         {children}
+        <Toaster />
       </body>
     </html>
   );

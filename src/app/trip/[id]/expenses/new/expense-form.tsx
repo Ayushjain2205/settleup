@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
+import { tick } from "@/lib/haptics";
+import { toast } from "@/components/toast";
 import { computeSplitOwes } from "@/lib/splits";
 import { compressImage, mapScanToLines, type ScanResult } from "@/lib/scan";
 import { PayerPicker } from "@/components/payer-picker";
@@ -187,6 +189,9 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
       }
 
       router.push(`/trip/${group.id}`);
+      router.refresh();
+      tick();
+      toast(isEdit ? "Expense updated" : "Expense added");
     } catch (err) {
       setError(errorMessage(err, "Could not save expense"));
     } finally {

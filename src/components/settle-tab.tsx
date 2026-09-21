@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
+import { tick } from "@/lib/haptics";
+import { toast } from "@/components/toast";
 import type { Settlement, Member } from "@/lib/mock-data";
 
 export interface RecordedPayment {
@@ -51,6 +53,8 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
       });
       if (error) throw error;
       router.refresh();
+      tick();
+      toast("Payment recorded");
     } catch (err) {
       setError(errorMessage(err, "Could not record payment"));
     } finally {

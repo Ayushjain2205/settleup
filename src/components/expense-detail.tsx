@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/error";
+import { tick } from "@/lib/haptics";
+import { toast } from "@/components/toast";
 import type { Expense, Member } from "@/lib/mock-data";
 
 interface ExpenseDetailProps {
@@ -30,12 +33,14 @@ export function ExpenseDetail({ groupId, expense, members, splits, onClose }: Ex
     setError(null);
     const { error } = await supabase.from("expenses").delete().eq("id", expense.id);
     if (error) {
-      setError(error.message);
+      setError(errorMessage(error, "Could not delete expense"));
       setIsDeleting(false);
       return;
     }
     onClose();
     router.refresh();
+    tick();
+    toast("Expense deleted");
   };
 
   return (

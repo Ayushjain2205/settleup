@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { tick } from "@/lib/haptics";
+import { toast } from "@/components/toast";
 
 interface SettingsFormProps {
   group: {
@@ -112,6 +114,8 @@ export function SettingsForm({ group, members, currentUserId }: SettingsFormProp
     setNewEmail("");
     setShowAddMember(false);
     router.refresh();
+    tick();
+    toast("Member added");
   };
 
   return (
