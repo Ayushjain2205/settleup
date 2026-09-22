@@ -6,7 +6,7 @@ export default async function AddExpensePage({ params }: { params: Promise<{ id:
   const supabase = await createClient();
 
   const [{ data: { user } }, { data: group }, { data: memberRows }] = await Promise.all([
-    supabase.auth.getUser(),
+    supabase.auth.getSession().then(({ data }) => ({ data: { user: data.session?.user ?? null } })),
     supabase
       .from("groups")
       .select("id, name, base_currency, spend_currency, fixed_fx_rate")

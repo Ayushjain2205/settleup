@@ -6,7 +6,7 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 export default async function EditExpensePage({ params }: { params: Promise<{ id: string; expenseId: string }> }) {
   const { id, expenseId } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getSession().then(({ data }) => ({ data: { user: data.session?.user ?? null } }));
 
   if (!user) {
     return (

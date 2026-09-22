@@ -6,7 +6,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
   const supabase = await createClient();
 
   const [{ data: { user } }, { data: group }] = await Promise.all([
-    supabase.auth.getUser(),
+    supabase.auth.getSession().then(({ data }) => ({ data: { user: data.session?.user ?? null } })),
     supabase
       .from("groups")
       .select("id, name, base_currency, spend_currency, fixed_fx_rate, simplify_debts")
