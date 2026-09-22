@@ -17,6 +17,8 @@ export interface Expense {
   splitType: "equal" | "exact" | "itemized";
   date: string;
   category: "food" | "transport" | "activity" | "accommodation" | "other";
+  /** Detailed category id (e.g. dining_out); falls back to broad category. */
+  categoryId?: string;
 }
 
 export interface Balance {

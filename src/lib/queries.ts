@@ -199,6 +199,7 @@ export function useExpenses(groupId: string, baseCurrency: string, sessionReady:
         splitType: e.split_mode === "percent" ? "exact" : (e.split_mode as Expense["splitType"]),
         date: e.expense_date,
         category: broadOf(e.category_id),
+        categoryId: e.category_id,
       }));
       const splitDetails: Record<string, { memberId: string; amount: number }[]> = {};
       for (const s of splitRows || []) {

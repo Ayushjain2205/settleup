@@ -99,8 +99,10 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
 
             <div className="divide-y divide-[var(--border-color)]">
               {dayExpenses.map((expense) => {
+                const detailed = expense.categoryId ? CATEGORIES.find((c) => c.id === expense.categoryId) : undefined;
                 const cat = getIcon(expense.category);
-                const IconComp = cat.Icon;
+                const IconComp = detailed?.Icon || cat.Icon;
+                const colorClass = detailed?.colorClass || BROAD_COLOR[expense.category];
                 const swipedOpen = swipeOpenId === expense.id;
                 return (
                   <SwipeRow
@@ -114,7 +116,7 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
                     <div
                       onClick={() => (swipedOpen ? setSwipeOpenId(null) : setOpenId(expense.id))}
                       className="w-full list-item bg-white active:bg-[var(--background)] transition-colors text-left cursor-pointer">
-                    <div className={`w-9 h-9 rounded-lg ${BROAD_COLOR[expense.category]} flex items-center justify-center flex-shrink-0`}>
+                    <div className={`w-9 h-9 rounded-lg ${colorClass} flex items-center justify-center flex-shrink-0`}>
                       <IconComp className="w-4 h-4" strokeWidth={1.5} />
                     </div>
                     <div className="flex-1 min-w-0">
