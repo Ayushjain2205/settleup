@@ -17,14 +17,24 @@ function ResetForm() {
 
   useEffect(() => {
     const code = searchParams.get("code");
-    if (!code) {
+    const tokenHash = searchParams.get("token_hash");
+    const type = searchParams.get("type");
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        setStatus(error ? "invalid" : "ready");
+        if (error) setError("This reset link is invalid or expired. Request a new one.");
+      });
+    } else if (tokenHash) {
+      supabase.auth
+        .verifyOtp({ token_hash: tokenHash, type: (type as "recovery") || "recovery" })
+        .then(({ error }) => {
+          setStatus(error ? "invalid" : "ready");
+          if (error) setError("This reset link is invalid or expired. Request a new one.");
+        });
+    } else {
       setStatus("invalid");
-      return;
+      setError("This reset link is invalid or expired. Request a new one.");
     }
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      setStatus(error ? "invalid" : "ready");
-      if (error) setError("This reset link is invalid or expired. Request a new one.");
-    });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
