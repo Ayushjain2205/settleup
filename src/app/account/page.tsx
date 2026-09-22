@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { User } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { useSession } from "@/lib/queries";
 import { errorMessage } from "@/lib/error";
 import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
@@ -12,20 +13,19 @@ import { BottomNav } from "@/components/bottom-nav";
 
 export default function AccountPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const supabase = createClient();
-  const [user, setUser] = useState<User | null>(null);
+  const { data: session, isLoading: loading } = useSession();
+  const user = session?.user || null;
   const [showChange, setShowChange] = useState(false);
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [pwError, setPwError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
-  }, []);
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    queryClient.clear();
     router.push("/login");
   };
 
@@ -67,27 +67,41 @@ export default function AccountPage() {
       </header>
 
       <main className="pb-[calc(4rem+var(--safe-bottom))]">
-        {/* Profile */}
-        <div className="px-4 py-4 bg-white border-b border-[var(--border-color)]">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-[var(--primary)] flex items-center justify-center text-base font-bold text-white">
-              {initial}
+        {loading ? (
+          <div className="px-4 py-4 bg-white border-b border-[var(--border-color)] animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-[var(--border-color)]" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-32 rounded bg-[var(--border-color)]" />
+                <div className="h-3 w-48 rounded bg-[var(--border-color)]" />
+              </div>
             </div>
-            <div className="flex-1">
-              <div className="text-base font-semibold text-[var(--foreground)]">{displayName}</div>
-              <div className="text-xs text-[var(--muted)]">{user?.email || "Not signed in"}</div>
-            </div>
-            {user ? (
-              <button onClick={handleSignOut} className="text-xs font-semibold text-[var(--error)]">
-                Sign out
-              </button>
-            ) : (
-              <Link href="/login" className="text-xs font-semibold text-[var(--primary)]">
-                Sign in
-              </Link>
-            )}
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Profile */}
+            <div className="px-4 py-4 bg-white border-b border-[var(--border-color)]">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-[var(--primary)] flex items-center justify-center text-base font-bold text-white">
+                  {initial}
+                </div>
+                <div className="flex-1">
+                  <div className="text-base font-semibold text-[var(--foreground)]">{displayName}</div>
+                  <div className="text-xs text-[var(--muted)]">{user?.email || "Not signed in"}</div>
+                </div>
+                {user ? (
+                  <button onClick={handleSignOut} className="text-xs font-semibold text-[var(--error)]">
+                    Sign out
+                  </button>
+                ) : (
+                  <Link href="/login" className="text-xs font-semibold text-[var(--primary)]">
+                    Sign in
+                  </Link>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         {user && (
           <div className="mt-4 bg-white border-y border-[var(--border-color)]">
