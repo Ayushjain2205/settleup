@@ -5,12 +5,20 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/error";
+import { success } from "@/lib/haptics";
+import { toast } from "@/components/toast";
 import { BottomNav } from "@/components/bottom-nav";
 
 export default function AccountPage() {
   const router = useRouter();
   const supabase = createClient();
   const [user, setUser] = useState<User | null>(null);
+  const [showChange, setShowChange] = useState(false);
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -19,6 +27,32 @@ export default function AccountPage() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/login");
+  };
+
+  const handleChangePassword = async () => {
+    setPwError(null);
+    if (newPw.length < 6) {
+      setPwError("Password must be at least 6 characters");
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setPwError("Passwords don't match");
+      return;
+    }
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPw });
+      if (error) throw error;
+      setNewPw("");
+      setConfirmPw("");
+      setShowChange(false);
+      success();
+      toast("Password updated");
+    } catch (err) {
+      setPwError(errorMessage(err, "Could not update password"));
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const displayName = (user?.user_metadata?.display_name as string) || user?.email?.split("@")[0] || "You";
@@ -54,6 +88,47 @@ export default function AccountPage() {
             )}
           </div>
         </div>
+
+        {user && (
+          <div className="mt-4 bg-white border-y border-[var(--border-color)]">
+            <button onClick={() => { setShowChange((s) => !s); setPwError(null); }} className="w-full flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-medium text-[var(--foreground)]">Change password</span>
+              <svg className={`w-4 h-4 text-[var(--muted)] transition-transform ${showChange ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showChange && (
+              <div className="px-4 pb-4 space-y-3">
+                <input
+                  type="password"
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  placeholder="New password"
+                  autoComplete="new-password"
+                  className="w-full px-4 py-3 bg-[var(--background)] rounded-xl text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)]/40 focus:outline-none"
+                />
+                <input
+                  type="password"
+                  value={confirmPw}
+                  onChange={(e) => setConfirmPw(e.target.value)}
+                  placeholder="Confirm new password"
+                  autoComplete="new-password"
+                  className="w-full px-4 py-3 bg-[var(--background)] rounded-xl text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)]/40 focus:outline-none"
+                />
+                {pwError && (
+                  <p className="text-xs font-medium text-[var(--error)]">{pwError}</p>
+                )}
+                <button
+                  onClick={handleChangePassword}
+                  disabled={isUpdating}
+                  className="w-full py-3 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold active:opacity-80 transition-opacity disabled:opacity-50"
+                >
+                  {isUpdating ? "Updating..." : "Update password"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="px-4 py-6 text-center">
           <p className="text-[10px] text-[var(--muted)]">SettleUp v0.1.0</p>
