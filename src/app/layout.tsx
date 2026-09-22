@@ -4,7 +4,6 @@ import "./globals.css";
 import { SwRegister } from "@/components/sw-register";
 import { BootSplash } from "@/components/boot-splash";
 import { Toaster } from "@/components/toast";
-import { PerfHud } from "@/components/perf-hud";
 import { Providers } from "@/components/providers";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -43,7 +42,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SwRegister />
         <Providers>{children}</Providers>
         <Toaster />
-        <PerfHud />
       </body>
     </html>
   );
