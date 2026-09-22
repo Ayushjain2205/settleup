@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/browser";
 import { CATEGORIES } from "@/lib/categories";
 import { mapGroupRows } from "@/lib/group-map";
@@ -282,6 +283,65 @@ export function useRecorded(groupId: string, sessionReady: boolean) {
         currency: r.currency,
         date: r.created_at,
       }));
+    },
+    enabled: sessionReady,
+  });
+}
+
+/** Claim an email invite once per visit, then refresh members. */
+export function useClaimInvite(groupId: string) {
+  const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const claimed = useRef<string | null>(null);
+  const email = session?.user.email;
+
+  useEffect(() => {
+    if (!email || claimed.current === `${groupId}:${email}`) return;
+    claimed.current = `${groupId}:${email}`;
+    supabase
+      .from("group_members")
+      .update({ user_id: session?.user.id })
+      .is("user_id", null)
+      .eq("group_id", groupId)
+      .eq("email", email)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["members", groupId] });
+      });
+  }, [email, groupId, queryClient, session]);
+}
+
+export interface ExpenseDetailData {
+  id: string;
+  title: string;
+  amount: number;
+  currency: string;
+  paidBy: string;
+  splitMode: string;
+  categoryId: string;
+  expenseDate: string;
+  splits: { memberId: string; owed: number }[];
+}
+
+export function useExpenseDetail(groupId: string, expenseId: string, sessionReady: boolean) {
+  return useQuery({
+    queryKey: ["expense", groupId, expenseId],
+    queryFn: async (): Promise<ExpenseDetailData | null> => {
+      const [{ data: expense }, { data: splits }] = await Promise.all([
+        supabase.from("expenses").select("*").eq("id", expenseId).eq("group_id", groupId).single(),
+        supabase.from("expense_splits").select("member_id, amount_owed").eq("expense_id", expenseId),
+      ]);
+      if (!expense) return null;
+      return {
+        id: expense.id,
+        title: expense.title,
+        amount: Number(expense.amount),
+        currency: expense.currency,
+        paidBy: expense.paid_by,
+        splitMode: expense.split_mode,
+        categoryId: expense.category_id,
+        expenseDate: expense.expense_date,
+        splits: (splits || []).map((s) => ({ memberId: s.member_id, owed: Number(s.amount_owed) })),
+      };
     },
     enabled: sessionReady,
   });

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useExpenseDetail, useMembers, useSession, useTripMeta } from "@/lib/queries";
 import { errorMessage } from "@/lib/error";
 import { success, failure } from "@/lib/haptics";
 import { toast } from "@/components/toast";
@@ -32,48 +33,105 @@ interface MemberInfo {
   avatar: string;
 }
 
-export interface ExpenseInitial {
-  id: string;
-  title: string;
-  amount: string;
-  useBaseCurrency: boolean;
-  paidBy: string;
-  splitMode: SplitMode;
-  selectedMembers: string[];
-  exactAmounts: Record<string, string>;
-  percentages: Record<string, string>;
-  categoryId: string | null;
-  expenseDate: string;
-}
-
-export function ExpenseForm({ group, members, initial }: { group: GroupInfo; members: MemberInfo[]; initial?: ExpenseInitial }) {
+export function ExpenseForm() {
   const router = useRouter();
+  const params = useParams();
+  const groupId = params.id as string;
+  const expenseId = params.expenseId as string | undefined;
   const dateRef = useRef<HTMLInputElement>(null);
-  const isEdit = !!initial;
+  const isEdit = !!expenseId;
 
-  const [title, setTitle] = useState(initial?.title || "");
-  const [amount, setAmount] = useState(initial?.amount || "");
-  const [paidBy, setPaidBy] = useState(initial?.paidBy || members[0]?.id || "");
-  const [splitMode, setSplitMode] = useState<SplitMode>(initial?.splitMode || "equal");
-  const [selectedMembers, setSelectedMembers] = useState<string[]>(initial?.selectedMembers || members.map((m) => m.id));
-  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>(initial?.exactAmounts || {});
-  const [percentages, setPercentages] = useState<Record<string, string>>(initial?.percentages || {});
+  const { data: session, isLoading: sessionLoading } = useSession();
+  const ready = !sessionLoading && !!session;
+  const { data: meta, isLoading: metaLoading, error: metaError } = useTripMeta(groupId, ready);
+  const { data: memberRows, isLoading: membersLoading } = useMembers(groupId, ready);
+  const { data: detail, isLoading: detailLoading } = useExpenseDetail(groupId, expenseId || "", ready && isEdit);
+
+  const members: MemberInfo[] = memberRows || [];
+  const group: GroupInfo = {
+    id: groupId,
+    name: meta?.name || "",
+    baseCurrency: meta?.baseCurrency || "",
+    spendCurrency: meta?.spendCurrency || "",
+    fxRate: meta?.fxRate || 1,
+  };
+
+  const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
+  const [paidBy, setPaidBy] = useState("");
+  const [splitMode, setSplitMode] = useState<SplitMode>("equal");
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>({});
+  const [percentages, setPercentages] = useState<Record<string, string>>({});
   const [items, setItems] = useState<SplitItem[]>([]);
   const [showPayerPicker, setShowPayerPicker] = useState(false);
   const [showSplitOptions, setShowSplitOptions] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [expenseDate, setExpenseDate] = useState(initial?.expenseDate || (() => new Date().toISOString().split("T")[0]));
-  const [useBaseCurrency, setUseBaseCurrency] = useState(initial?.useBaseCurrency || false);
-  const [category, setCategory] = useState<Category | null>(
-    () => (initial?.categoryId ? CATEGORIES.find((c) => c.id === initial.categoryId) || null : null)
-  );
+  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [useBaseCurrency, setUseBaseCurrency] = useState(false);
+  const [category, setCategory] = useState<Category | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanStage, setScanStage] = useState(0);
+  const [hydratedId, setHydratedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scanTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveExpense = useSaveExpense(group.id);
+
+  // Create mode: default payer/selection once members arrive
+  useEffect(() => {
+    if (isEdit || members.length === 0) return;
+    if (!paidBy) setPaidBy(members[0].id);
+    if (selectedMembers.length === 0) setSelectedMembers(members.map((m) => m.id));
+  }, [members, isEdit, paidBy, selectedMembers.length]);
+
+  // Edit mode: hydrate once from fetched detail (balances pinned to balance)
+  useEffect(() => {
+    if (!isEdit || !detail || !meta || hydratedId === detail.id) return;
+    const round2 = (v: number) => Math.round(v * 100) / 100;
+    const useBase = detail.currency === meta.baseCurrency;
+    const toEntered = (base: number) => (useBase ? base : base / (meta.fxRate || 1));
+    const amountNum = detail.amount;
+    const baseTotal = detail.splits.reduce((s, x) => s + x.owed, 0);
+    const exact: Record<string, string> = {};
+    if (detail.splitMode !== "equal") {
+      let running = 0;
+      detail.splits.forEach((s, i) => {
+        const v = round2(toEntered(s.owed));
+        if (i < detail.splits.length - 1) {
+          exact[s.memberId] = String(v);
+          running += v;
+        } else {
+          exact[s.memberId] = String(round2(amountNum - running));
+        }
+      });
+    }
+    const pcts: Record<string, string> = {};
+    if (baseTotal > 0) {
+      let running = 0;
+      detail.splits.forEach((s, i) => {
+        const v = round2((s.owed / baseTotal) * 100);
+        if (i < detail.splits.length - 1) {
+          pcts[s.memberId] = String(v);
+          running += v;
+        } else {
+          pcts[s.memberId] = String(round2(100 - running));
+        }
+      });
+    }
+    setTitle(detail.title);
+    setAmount(String(amountNum));
+    setPaidBy(detail.paidBy);
+    setSplitMode(detail.splitMode === "itemized" ? "exact" : (detail.splitMode as SplitMode));
+    setSelectedMembers(detail.splits.map((s) => s.memberId));
+    setExactAmounts(exact);
+    setPercentages(pcts);
+    setExpenseDate(detail.expenseDate);
+    setUseBaseCurrency(useBase);
+    setCategory(detail.categoryId ? CATEGORIES.find((c) => c.id === detail.categoryId) || null : null);
+    setHydratedId(detail.id);
+  }, [detail, isEdit, meta, hydratedId]);
 
   const SCAN_STAGES = ["Uploading receipt…", "Reading receipt…", "Extracting items…"];
 
@@ -152,7 +210,7 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
         splitMode,
         expenseDate,
         splits: computeSplits(),
-        expenseId: isEdit ? initial.id : null,
+        expenseId: isEdit ? expenseId || null : null,
       });
 
       router.push(`/trip/${group.id}`);
@@ -215,6 +273,67 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
     setPercentages(pcts);
     setItems(confirmedItems);
   };
+
+  const dataLoading = sessionLoading || metaLoading || membersLoading || (isEdit && detailLoading);
+
+  if (!sessionLoading && !session) {
+    return (
+      <div className="min-h-dvh bg-[var(--background)] flex flex-col items-center justify-center px-6">
+        <p className="text-sm font-medium text-[var(--foreground)]">Sign in to add an expense</p>
+        <button onClick={() => router.push("/login")} className="mt-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-semibold">
+          Sign in
+        </button>
+      </div>
+    );
+  }
+
+  if (session && !metaLoading && (metaError || !meta)) {
+    return (
+      <div className="min-h-dvh bg-[var(--background)] flex flex-col items-center justify-center px-6">
+        <p className="text-sm font-medium text-[var(--foreground)]">Group not found</p>
+        <button onClick={() => router.push("/")} className="mt-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-semibold">
+          Back to groups
+        </button>
+      </div>
+    );
+  }
+
+  if (isEdit && session && !detailLoading && !detail) {
+    return (
+      <div className="min-h-dvh bg-[var(--background)] flex flex-col items-center justify-center px-6">
+        <p className="text-sm font-medium text-[var(--foreground)]">Expense not found</p>
+        <button onClick={() => router.push(`/trip/${groupId}`)} className="mt-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-semibold">
+          Back to group
+        </button>
+      </div>
+    );
+  }
+
+  if (dataLoading || !meta || members.length === 0) {
+    return (
+      <div className="min-h-dvh bg-[var(--background)] flex flex-col animate-pulse">
+        <header className="sticky top-0 z-40 bg-white/80 border-b border-[var(--border-color)]">
+          <div className="flex items-center h-14 px-4">
+            <div className="w-5 h-5 rounded bg-[var(--border-color)] mr-3" />
+            <div className="flex-1 flex justify-center">
+              <div className="h-4 w-28 rounded bg-[var(--border-color)]" />
+            </div>
+            <div className="h-4 w-10 rounded bg-[var(--border-color)]" />
+          </div>
+        </header>
+        <div className="flex-1 flex flex-col px-4 pt-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-[var(--border-color)] flex-shrink-0" />
+            <div className="flex-1 h-8 rounded bg-[var(--border-color)]" />
+          </div>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-[var(--border-color)] flex-shrink-0" />
+            <div className="flex-1 h-10 rounded bg-[var(--border-color)]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-[var(--background)] flex flex-col">

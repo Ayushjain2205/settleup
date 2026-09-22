@@ -1,16 +1,17 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { mark } from "@/lib/perf";
+import { useClaimInvite, useSession, useTripMeta } from "@/lib/queries";
 import { BottomNav } from "@/components/bottom-nav";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { ExpensesList } from "@/components/expenses-list";
 import { BalancesPanel } from "@/components/balances-panel";
 import { SettleTab } from "@/components/settle-tab";
-import { useExpenses, useMembers, useRecorded, useSession } from "@/lib/queries";
+import { useExpenses, useMembers, useRecorded } from "@/lib/queries";
 import { computeBalances, simplifyDebts } from "@/lib/settlements";
 
 type Tab = "expenses" | "balances" | "settle";
@@ -117,42 +118,83 @@ function SettlePane({ groupId, display, simplify }: { groupId: string; display: 
 }
 
 interface TripShellProps {
-  tripId: string;
-  tripName: string;
-  baseCurrency: string;
-  spendCurrency: string;
-  fxRate: number;
-  simplify: boolean;
+  tripId?: string;
 }
 
-export function TripShell({ tripId, tripName, baseCurrency, spendCurrency, fxRate, simplify }: TripShellProps) {
-  const searchParams = useSearchParams();
+export function TripShell({ tripId: propId }: TripShellProps) {
+  const params = useParams();
+  const tripId = propId || (params.id as string);
   const queryClient = useQueryClient();
-  const initialTab = (searchParams.get("tab") as Tab) || "expenses";
-  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+  const [activeTab, setActiveTab] = useState<Tab>("expenses");
+  const { data: session, isLoading: sessionLoading } = useSession();
+  const ready = !sessionLoading && !!session;
+  const { data: meta, isLoading: metaLoading, error: metaError } = useTripMeta(tripId, ready);
+  useClaimInvite(tripId);
 
   const storageKey = `settleup-display-currency-${tripId}`;
   const [displayCode, setDisplayCode] = useState(() => {
-    if (typeof window === "undefined") return spendCurrency;
-    return window.localStorage.getItem(storageKey) || spendCurrency;
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(storageKey) || "";
   });
   useEffect(() => {
     mark("shell");
-    window.localStorage.setItem(storageKey, displayCode);
+    if (displayCode) window.localStorage.setItem(storageKey, displayCode);
   }, [storageKey, displayCode]);
+
+  const baseCurrency = meta?.baseCurrency || "";
+  const spendCurrency = meta?.spendCurrency || "";
+  const fxRate = meta?.fxRate || 1;
+  const simplify = meta?.simplifyDebts ?? true;
+  const tripName = meta?.name || "";
+  const code = displayCode || spendCurrency;
 
   const display: DisplayCtx = useMemo(
     () => ({
-      code: displayCode,
+      code,
       baseCurrency,
       spendCurrency,
       fxRate,
-      show: (base: number) => (displayCode === baseCurrency ? base : round2(base / (fxRate || 1))),
+      show: (base: number) => (code === baseCurrency || !baseCurrency ? base : round2(base / (fxRate || 1))),
     }),
-    [displayCode, baseCurrency, spendCurrency, fxRate]
+    [code, baseCurrency, spendCurrency, fxRate]
   );
 
-  const multiCurrency = baseCurrency !== spendCurrency;
+  const multiCurrency = !!baseCurrency && !!spendCurrency && baseCurrency !== spendCurrency;
+
+  if (!ready) {
+    return (
+      <div className="min-h-dvh bg-[var(--background)]">
+        <header className="sticky top-0 z-40 bg-white/80 border-b border-[var(--border-color)]">
+          <div className="flex items-center h-14 px-4">
+            <div className="h-5 w-32 rounded bg-[var(--border-color)] animate-pulse" />
+          </div>
+        </header>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-dvh bg-[var(--background)] flex flex-col items-center justify-center px-6">
+        <p className="text-sm font-medium text-[var(--foreground)]">Sign in to view this group</p>
+        <Link href="/login" className="mt-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-semibold">
+          Sign in
+        </Link>
+      </div>
+    );
+  }
+
+  if (!metaLoading && (metaError || !meta)) {
+    return (
+      <div className="min-h-dvh bg-[var(--background)] flex flex-col items-center justify-center px-6">
+        <p className="text-sm font-medium text-[var(--foreground)]">Group not found</p>
+        <p className="text-xs text-[var(--muted)] mt-1">It may have been deleted or you don&apos;t have access</p>
+        <Link href="/" className="mt-4 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-semibold">
+          Back to groups
+        </Link>
+      </div>
+    );
+  }
 
   const panes: Record<Tab, ReactNode> = {
     expenses: <ExpensesPane groupId={tripId} display={display} />,
@@ -208,7 +250,7 @@ export function TripShell({ tripId, tripName, baseCurrency, spendCurrency, fxRat
                 key={c}
                 onClick={() => setDisplayCode(c)}
                 className={`px-3 py-1 rounded-md text-[11px] font-bold transition-colors ${
-                  displayCode === c ? "bg-[var(--primary)] text-white" : "text-[var(--muted)]"
+                  code === c ? "bg-[var(--primary)] text-white" : "text-[var(--muted)]"
                 }`}
               >
                 {c}
