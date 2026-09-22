@@ -22,7 +22,7 @@ describe("buildFeed", () => {
     expect(item.detail).toBe("“Lunch” in “Trip”");
     expect(item.impact).toEqual({ text: "You owe ₹250", tone: "bad" });
     expect(item.icon).toBe("dining_out");
-    expect(item.actorAvatar).toBe("A");
+    expect(item.actorAvatar).toBe("T");
   });
 
   it("shows no impact when I'm not in the split", () => {

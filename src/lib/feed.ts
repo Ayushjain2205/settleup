@@ -114,7 +114,7 @@ export function buildFeed(
       trip: g.name,
       impact: myShare > 0 ? { text: `You owe ${fmt(g.baseCurrency, myShare)}`, tone: "bad" } : null,
       icon: e.category_id,
-      actorAvatar: avatarOf(e.paid_by),
+      actorAvatar: g.name[0]?.toUpperCase() || "?",
     });
   }
   for (const s of settlements) {
@@ -139,7 +139,7 @@ export function buildFeed(
       trip: g.name,
       impact,
       icon: "cash",
-      actorAvatar: avatarOf(s.from_member),
+      actorAvatar: g.name[0]?.toUpperCase() || "?",
     });
   }
   return feed.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
