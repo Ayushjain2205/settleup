@@ -16,17 +16,37 @@ const SPLITS = [
 ];
 
 describe("buildFeed", () => {
-  it("shows my share as impact on expenses I split", () => {
+  it("shows what others owe me on bills I paid", () => {
     const [item] = buildFeed(GROUPS, MEMBERS, EXPENSES, [], SPLITS, "u1");
     expect(item.subject).toBe("You");
     expect(item.detail).toBe("“Lunch” in “Trip”");
-    expect(item.impact).toEqual({ text: "You owe ₹250", tone: "bad" });
+    expect(item.impact).toEqual({ text: "You are owed ₹250", tone: "good" });
     expect(item.icon).toBe("dining_out");
     expect(item.actorAvatar).toBe("T");
   });
 
-  it("shows no impact when I'm not in the split", () => {
-    const [item] = buildFeed(GROUPS, MEMBERS, EXPENSES, [], [], "u1");
+  it("shows my share on bills others paid", () => {
+    const feed = buildFeed(
+      GROUPS,
+      [...MEMBERS, { id: "m9", group_id: "g1", user_id: "u9", name: "Zed", avatar: "Z" }],
+      EXPENSES,
+      [],
+      [...SPLITS, { expense_id: "e1", member_id: "m9", amount_owed: 100 }],
+      "u9"
+    );
+    expect(feed[0].subject).toBe("You");
+    expect(feed[0].impact).toEqual({ text: "You owe ₹100", tone: "bad" });
+  });
+
+  it("shows no impact when I'm not involved at all", () => {
+    const [item] = buildFeed(GROUPS, MEMBERS, EXPENSES, [], SPLITS, "stranger");
+    expect(item.impact).toBeNull();
+  });
+
+  it("shows nothing extra on self-only bills I paid", () => {
+    const solo = [{ id: "e1", group_id: "g1", title: "Cab", base_amount: 470, paid_by: "m1", category_id: "taxi", created_at: "2026-03-15T10:00:00Z" }];
+    const soloSplits = [{ expense_id: "e1", member_id: "m1", amount_owed: 470 }];
+    const [item] = buildFeed(GROUPS, MEMBERS, solo, [], soloSplits, "u1");
     expect(item.impact).toBeNull();
   });
 

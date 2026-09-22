@@ -102,7 +102,18 @@ export function buildFeed(
   for (const e of expenses) {
     const g = groupById.get(e.group_id);
     if (!g) continue;
+    const total = Number(e.base_amount);
     const myShare = shareOf(e.id, myMemberByGroup.get(e.group_id));
+    const iPaid = myMemberByGroup.get(e.group_id) === e.paid_by;
+    // What matters on a bill: others' debt to me if I paid,
+    // my debt if someone else did. Self-only bills show nothing.
+    let impact: EnrichedFeedItem["impact"] = null;
+    if (iPaid) {
+      const othersOwe = total - myShare;
+      if (othersOwe > 0.009) impact = { text: `You are owed ${fmt(g.baseCurrency, othersOwe)}`, tone: "good" };
+    } else if (myShare > 0.009) {
+      impact = { text: `You owe ${fmt(g.baseCurrency, myShare)}`, tone: "bad" };
+    }
     feed.push({
       key: `e-${e.id}`,
       at: e.created_at,
@@ -112,7 +123,7 @@ export function buildFeed(
       detail: `“${e.title}” in “${g.name}”`,
       amount: null,
       trip: g.name,
-      impact: myShare > 0 ? { text: `You owe ${fmt(g.baseCurrency, myShare)}`, tone: "bad" } : null,
+      impact,
       icon: e.category_id,
       actorAvatar: g.name[0]?.toUpperCase() || "?",
     });
