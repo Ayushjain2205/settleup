@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
+import { mark } from "@/lib/perf";
 import { BottomNav } from "@/components/bottom-nav";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { ExpensesList } from "@/components/expenses-list";
@@ -50,6 +51,9 @@ function ExpensesPane({ groupId, display }: { groupId: string; display: DisplayC
   const { ready, loading } = useReady();
   const { data, isLoading } = useExpenses(groupId, display.baseCurrency, ready);
   const { data: members } = useMembers(groupId, ready);
+  useEffect(() => {
+    if (data && members) mark("data-expenses");
+  }, [data, members]);
   const shown = useMemo(() => {
     if (!data) return null;
     if (display.code === display.baseCurrency) return data;
@@ -133,6 +137,7 @@ export function TripShell({ tripId, tripName, baseCurrency, spendCurrency, fxRat
     return window.localStorage.getItem(storageKey) || spendCurrency;
   });
   useEffect(() => {
+    mark("shell");
     window.localStorage.setItem(storageKey, displayCode);
   }, [storageKey, displayCode]);
 
