@@ -34,7 +34,7 @@ describe("buildFeed", () => {
       [...SPLITS, { expense_id: "e1", member_id: "m9", amount_owed: 100 }],
       "u9"
     );
-    expect(feed[0].subject).toBe("You");
+    expect(feed[0].subject).toBe("Ayush");
     expect(feed[0].impact).toEqual({ text: "You owe ₹100", tone: "bad" });
   });
 
