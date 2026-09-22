@@ -11,13 +11,18 @@ interface ExpenseDetailProps {
   expense: Expense;
   members: Member[];
   splits: { memberId: string; amount: number }[];
+  /** Base-currency split rows need conversion when displaying spend. */
+  displayCurrency: string;
+  baseCurrency: string;
+  fxRate: number;
   onClose: () => void;
   onDeleted: (id: string) => void;
 }
 
 const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
+const round2 = (v: number) => Math.round(v * 100) / 100;
 
-export function ExpenseDetail({ groupId, expense, members, splits, onClose, onDeleted }: ExpenseDetailProps) {
+export function ExpenseDetail({ groupId, expense, members, splits, displayCurrency, baseCurrency, fxRate, onClose, onDeleted }: ExpenseDetailProps) {
   const router = useRouter();
   const deleteExpense = useDeleteExpense(groupId);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -82,6 +87,7 @@ export function ExpenseDetail({ groupId, expense, members, splits, onClose, onDe
             {splits.map((s) => {
               const m = getMember(s.memberId);
               if (!m) return null;
+              const shown = displayCurrency === baseCurrency ? s.amount : round2(s.amount / (fxRate || 1));
               return (
                 <div key={s.memberId} className="flex items-center gap-3 px-4 py-2.5">
                   <div className="w-8 h-8 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[10px] font-bold text-[var(--primary)] flex-shrink-0">
@@ -89,7 +95,7 @@ export function ExpenseDetail({ groupId, expense, members, splits, onClose, onDe
                   </div>
                   <span className="flex-1 text-sm font-medium text-[var(--foreground)]">{m.name}</span>
                   <span className="text-sm font-semibold text-[var(--foreground)] tabular-nums">
-                    {symbol(expense.baseCurrency)}{s.amount.toLocaleString()}
+                    {symbol(displayCurrency)}{shown.toLocaleString()}
                   </span>
                 </div>
               );

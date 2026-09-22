@@ -17,6 +17,9 @@ interface ExpensesListProps {
   members: Member[];
   splitDetails: Record<string, { memberId: string; amount: number }[]>;
   groupId: string;
+  displayCurrency: string;
+  baseCurrency: string;
+  fxRate: number;
 }
 
 const BROAD_ICON = Object.fromEntries(
@@ -32,7 +35,7 @@ const BROAD_COLOR: Record<string, string> = {
   other: "bg-stone-50 text-stone-600",
 };
 
-export function ExpensesList({ expenses, members, splitDetails, groupId }: ExpensesListProps) {
+export function ExpensesList({ expenses, members, splitDetails, groupId, displayCurrency, baseCurrency, fxRate }: ExpensesListProps) {
   const groupedByDate = expenses.reduce((acc, expense) => {
     if (!acc[expense.date]) acc[expense.date] = [];
     acc[expense.date].push(expense);
@@ -142,6 +145,9 @@ export function ExpensesList({ expenses, members, splitDetails, groupId }: Expen
           expense={openExpense}
           members={members}
           splits={splitDetails[openExpense.id] || []}
+          displayCurrency={displayCurrency}
+          baseCurrency={baseCurrency}
+          fxRate={fxRate}
           onClose={() => setOpenId(null)}
           onDeleted={handleDetailDeleted}
         />

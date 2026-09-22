@@ -57,7 +57,7 @@ function ExpensesPane({ groupId, display }: { groupId: string; display: DisplayC
     };
   }, [data, display]);
   if (loading || isLoading || !shown || !members) return <TabFallback />;
-  return <ExpensesList expenses={shown.expenses} members={members} splitDetails={shown.splitDetails} groupId={groupId} />;
+  return <ExpensesList expenses={shown.expenses} members={members} splitDetails={shown.splitDetails} groupId={groupId} displayCurrency={display.code} baseCurrency={display.baseCurrency} fxRate={display.fxRate} />;
 }
 
 function BalancesPane({ groupId, display }: { groupId: string; display: DisplayCtx }) {
