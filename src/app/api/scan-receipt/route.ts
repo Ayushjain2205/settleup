@@ -89,6 +89,7 @@ export async function POST(request: Request) {
 
   const bytes = Buffer.from(await blob.arrayBuffer()).toString("base64");
   const models = MODEL === FALLBACK_MODEL ? [MODEL] : [MODEL, FALLBACK_MODEL];
+  let lastError: unknown = null;
 
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -102,7 +103,9 @@ export async function POST(request: Request) {
           adjustments: Array.isArray(parsed.adjustments) ? parsed.adjustments : [],
         });
       } catch (e) {
+        lastError = e;
         if (!isRetryable(e)) {
+          console.error("scan-receipt:non-retryable", model, (e as { status?: number })?.status, (e as Error)?.message);
           return NextResponse.json({ error: "Could not read receipt — enter it manually" }, { status: 422 });
         }
         await sleep(1500 * (attempt + 1));
@@ -110,5 +113,10 @@ export async function POST(request: Request) {
     }
   }
 
+  console.error(
+    "scan-receipt:exhausted",
+    (lastError as { status?: number })?.status,
+    (lastError as Error)?.message?.slice(0, 300)
+  );
   return NextResponse.json({ error: "Receipt service is busy — try again in a bit" }, { status: 503 });
 }
