@@ -196,6 +196,7 @@ export function ExpenseForm({ group, members, initial }: { group: GroupInfo; mem
       if (lines.length > 0) {
         setItems(lines);
         setSplitMode("itemized");
+        setShowSplitOptions(true);
       }
       success();
     } catch (err) {
