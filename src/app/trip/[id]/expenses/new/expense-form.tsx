@@ -480,7 +480,6 @@ export function ExpenseForm() {
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleScanPick}
             className="sr-only"
           />
