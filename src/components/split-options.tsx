@@ -228,7 +228,7 @@ export function SplitOptions({
                       </button>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     {members.map((member) => (
                       <button
                         key={member.id}
@@ -241,13 +241,21 @@ export function SplitOptions({
                           }
                           setItems(newItems);
                         }}
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${
+                        title={member.name}
+                        className={`min-w-8 h-8 px-1.5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${
                           item.splitAmong.includes(member.id) ? "bg-[var(--primary)] text-white" : "bg-[var(--border-color)]/50 text-[var(--muted)]"
                         }`}
                       >
-                        {member.avatar}
+                        {member.name.slice(0, 2).toUpperCase()}
                       </button>
                     ))}
+                    <span className="text-[10px] text-[var(--muted)] ml-1">
+                      {item.splitAmong.length === 0
+                        ? "Nobody — tap to assign"
+                        : item.splitAmong.length === members.length
+                          ? "Everyone"
+                          : item.splitAmong.map((id) => members.find((m) => m.id === id)?.name || "?").join(", ")}
+                    </span>
                   </div>
                 </div>
               ))}
