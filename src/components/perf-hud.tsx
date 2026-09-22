@@ -13,12 +13,8 @@ export function PerfHud() {
   const [rows, setRows] = useState<Row[]>([]);
 
   useEffect(() => {
-    try {
-      if (window.location.search.includes("perf=1")) window.localStorage.setItem("settleup-perf", "1");
-      if (window.localStorage.getItem("settleup-perf") !== "1") return;
-    } catch {
-      return;
-    }
+    // TEMP: forced on for PWA diagnosis (no address bar to pass ?perf=1).
+    // Revert to the localStorage gate after.
     setEnabled(true);
 
     const collect = () => {
