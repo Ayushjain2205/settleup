@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/browser";
 import { CATEGORIES } from "@/lib/categories";
 import { mapGroupRows } from "@/lib/group-map";
-import { buildFeed } from "@/lib/feed";
+import { buildFeed, type EnrichedFeedItem } from "@/lib/feed";
 import { computePosition, type Position } from "@/lib/position";
 import type { Expense, Member } from "@/lib/mock-data";
 
@@ -232,13 +232,13 @@ export function useActivityFeed() {
     sessionLoading,
     ...useQuery({
       queryKey: ["activity", groupIds.join(",")],
-      queryFn: async (): Promise<FeedItem[]> => {
+      queryFn: async (): Promise<EnrichedFeedItem[]> => {
         const groupList = (groups || []).map((g) => ({ id: g.id, name: g.name, baseCurrency: g.baseCurrency }));
         const [{ data: members }, { data: expenses }, { data: settlements }] = await Promise.all([
-          supabase.from("group_members").select("id, group_id, name, user_id").in("group_id", groupIds),
+          supabase.from("group_members").select("id, group_id, name, user_id, avatar").in("group_id", groupIds),
           supabase
             .from("expenses")
-            .select("id, group_id, title, base_amount, paid_by, created_at")
+            .select("id, group_id, title, base_amount, paid_by, category_id, created_at")
             .in("group_id", groupIds)
             .order("created_at", { ascending: false })
             .limit(20),
@@ -250,7 +250,13 @@ export function useActivityFeed() {
             .order("created_at", { ascending: false })
             .limit(20),
         ]);
-        return buildFeed(groupList, members || [], expenses || [], settlements || [], userId);
+        const expenseIds = (expenses || []).map((e) => e.id);
+        let splits: { expense_id: string; member_id: string; amount_owed: string | number }[] = [];
+        if (expenseIds.length > 0) {
+          const { data } = await supabase.from("expense_splits").select("expense_id, member_id, amount_owed").in("expense_id", expenseIds);
+          splits = data || [];
+        }
+        return buildFeed(groupList, members || [], expenses || [], settlements || [], splits, userId);
       },
       enabled: !sessionLoading && !!session && groupIds.length > 0,
     }),

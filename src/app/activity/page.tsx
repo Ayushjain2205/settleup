@@ -3,20 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useActivityFeed } from "@/lib/queries";
+import { categoryIcon, categoryStyle, timeFull } from "@/lib/feed";
 import { BottomNav } from "@/components/bottom-nav";
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 export default function ActivityPage() {
   const router = useRouter();
@@ -56,30 +44,40 @@ export default function ActivityPage() {
           </div>
         ) : (
           <div className="divide-y divide-[var(--border-color)]">
-            {feed.map((item) => (
+            {feed.map((item) => {
+              const Icon = categoryIcon(item.icon);
+              return (
               <div key={item.key} className="px-4 py-3 bg-white">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[var(--foreground)] flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
-                    {item.initial}
+                  <div className="relative flex-shrink-0">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${categoryStyle(item.icon)}`}>
+                      <Icon className="w-5 h-5" strokeWidth={1.5} />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[var(--foreground)] border-2 border-white flex items-center justify-center text-[7px] font-bold text-white">
+                      {item.actorAvatar}
+                    </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-[var(--foreground)]">
+                    <div className="text-sm text-[var(--foreground)] leading-snug">
                       <span className="font-semibold">{item.subject}</span>{" "}
                       <span className="text-[var(--muted)]">{item.action}</span>
                       {item.detail && (
                         <span className="font-medium"> {item.detail}</span>
                       )}
                     </div>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-[10px] text-[var(--muted)]">{item.trip} · {timeAgo(item.at)}</span>
-                      {item.amount && (
-                        <span className="text-xs font-semibold text-[var(--foreground)] tabular-nums">{item.amount}</span>
-                      )}
-                    </div>
+                    {item.impact ? (
+                      <div className={`text-sm font-semibold tabular-nums mt-0.5 ${item.impact.tone === "good" ? "text-[var(--success)]" : "text-[var(--error)]"}`}>
+                        {item.impact.text}
+                      </div>
+                    ) : item.amount ? (
+                      <div className="text-xs text-[var(--muted)] tabular-nums mt-0.5">{item.amount}</div>
+                    ) : null}
+                    <div className="text-[10px] text-[var(--muted)] mt-0.5">{timeFull(item.at)}</div>
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
