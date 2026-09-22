@@ -2,12 +2,15 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useActivityFeed } from "@/lib/queries";
 import { categoryIcon, categoryStyle, timeFull } from "@/lib/feed";
 import { BottomNav } from "@/components/bottom-nav";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 
 export default function ActivityPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { session, sessionLoading, data: feed, isLoading } = useActivityFeed();
 
   useEffect(() => {
@@ -23,6 +26,7 @@ export default function ActivityPage() {
       </header>
 
       <main className="pb-[calc(4rem+var(--safe-bottom))]">
+        <PullToRefresh onRefresh={() => queryClient.refetchQueries()}>
         {isLoading || sessionLoading ? (
           <div className="animate-pulse">
             {[0, 1, 2, 3].map((i) => (
@@ -80,6 +84,7 @@ export default function ActivityPage() {
             })}
           </div>
         )}
+        </PullToRefresh>
       </main>
 
       <BottomNav />

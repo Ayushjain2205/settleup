@@ -3,7 +3,9 @@
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { BottomNav } from "@/components/bottom-nav";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { ExpensesList } from "@/components/expenses-list";
 import { BalancesPanel } from "@/components/balances-panel";
 import { SettleTab } from "@/components/settle-tab";
@@ -121,6 +123,7 @@ interface TripShellProps {
 
 export function TripShell({ tripId, tripName, baseCurrency, spendCurrency, fxRate, simplify }: TripShellProps) {
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const initialTab = (searchParams.get("tab") as Tab) || "expenses";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
@@ -212,11 +215,13 @@ export function TripShell({ tripId, tripName, baseCurrency, spendCurrency, fxRat
 
       {/* Content — panes stay mounted (hidden) so tab switches never refetch */}
       <main className="pb-[calc(4rem+var(--safe-bottom))]">
-        {(Object.keys(panes) as Tab[]).map((tab) => (
-          <div key={tab} hidden={activeTab !== tab}>
-            <Suspense fallback={<TabFallback />}>{panes[tab]}</Suspense>
-          </div>
-        ))}
+        <PullToRefresh onRefresh={() => queryClient.refetchQueries()}>
+          {(Object.keys(panes) as Tab[]).map((tab) => (
+            <div key={tab} hidden={activeTab !== tab}>
+              <Suspense fallback={<TabFallback />}>{panes[tab]}</Suspense>
+            </div>
+          ))}
+        </PullToRefresh>
       </main>
 
       {/* FAB — Add Expense */}

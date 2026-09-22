@@ -3,8 +3,10 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGroups, useSession, symbol, type GroupListItem } from "@/lib/queries";
 import { BottomNav } from "@/components/bottom-nav";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 
 function Overall({ trips }: { trips: GroupListItem[] }) {
   const currencies = [...new Set(trips.map((t) => t.baseCurrency))];
@@ -75,6 +77,7 @@ function GroupsSkeleton() {
 
 export default function GroupsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session, isLoading: sessionLoading } = useSession();
   const { data: trips, isLoading: tripsLoading } = useGroups();
 
@@ -111,6 +114,7 @@ export default function GroupsPage() {
       </header>
 
       <main className="pb-[calc(4rem+var(--safe-bottom))]">
+        <PullToRefresh onRefresh={() => queryClient.refetchQueries()}>
         {/* Overall position */}
         {!tripsLoading && (trips || []).length > 0 && <Overall trips={trips || []} />}
 
@@ -197,6 +201,7 @@ export default function GroupsPage() {
             </Link>
           </div>
         )}
+        </PullToRefresh>
       </main>
 
       <BottomNav />
