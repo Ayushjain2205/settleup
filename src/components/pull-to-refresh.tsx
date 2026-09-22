@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const THRESHOLD = 72;
 const MAX_PULL = 120;
@@ -16,6 +16,21 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
   const [animating, setAnimating] = useState(false);
   const start = useRef<{ y: number } | null>(null);
   const pulling = useRef(false);
+  const lockScroll = useRef(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Non-passive: block the browser's own rubber-band while OUR pull owns
+  // the gesture, so sticky headers stay pinned. React listeners are
+  // passive and can't preventDefault — this one can.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const onMove = (e: TouchEvent) => {
+      if (lockScroll.current) e.preventDefault();
+    };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, []);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (window.scrollY > 0 || refreshing) return;
@@ -33,12 +48,14 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
       }
       pulling.current = true;
     }
+    lockScroll.current = pulling.current;
     setPull(Math.min(MAX_PULL, dy * 0.45));
   };
 
   const handleTouchEnd = async () => {
     if (!start.current) return;
     start.current = null;
+    lockScroll.current = false;
     if (!pulling.current) return;
     pulling.current = false;
     if (pull >= THRESHOLD) {
@@ -60,6 +77,7 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
 
   return (
     <div
+      ref={wrapRef}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
