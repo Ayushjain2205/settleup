@@ -1,8 +1,30 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
-const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-3.8-flash";
+const DEFAULT_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3.8-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-2.5-flash-lite",
+];
+
+function modelFleet(): string[] {
+  const models = (process.env.GEMINI_MODELS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const legacy of [process.env.GEMINI_MODEL, process.env.GEMINI_FALLBACK_MODEL]) {
+    if (legacy && !models.includes(legacy)) {
+      if (legacy === process.env.GEMINI_MODEL) models.unshift(legacy);
+      else models.push(legacy);
+    }
+  }
+  return models.length > 0 ? [...new Set(models)] : DEFAULT_MODELS;
+}
+
+// Hobby functions die at 10s — fail fast across the fleet instead of
+// long backoffs. Total budget for model calls: ~8s.
+const FLEET_BUDGET_MS = 8000;
 
 const SCHEMA = {
   type: "object",
@@ -36,8 +58,6 @@ const SCHEMA = {
   },
   required: ["merchant", "total", "items", "adjustments"],
 } as const;
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function isRetryable(e: unknown): boolean {
   const status = (e as { status?: number })?.status;
@@ -88,27 +108,25 @@ export async function POST(request: Request) {
   }
 
   const bytes = Buffer.from(await blob.arrayBuffer()).toString("base64");
-  const models = MODEL === FALLBACK_MODEL ? [MODEL] : [MODEL, FALLBACK_MODEL];
+  const started = Date.now();
   let lastError: unknown = null;
 
-  for (const model of models) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const parsed = await scanWith(model, bytes);
-        return NextResponse.json({
-          merchant: String(parsed.merchant || ""),
-          total: Number(parsed.total) || 0,
-          date: parsed.date || null,
-          items: Array.isArray(parsed.items) ? parsed.items : [],
-          adjustments: Array.isArray(parsed.adjustments) ? parsed.adjustments : [],
-        });
-      } catch (e) {
-        lastError = e;
-        if (!isRetryable(e)) {
-          console.error("scan-receipt:non-retryable", model, (e as { status?: number })?.status, (e as Error)?.message);
-          return NextResponse.json({ error: "Could not read receipt — enter it manually" }, { status: 422 });
-        }
-        await sleep(1500 * (attempt + 1));
+  for (const model of modelFleet()) {
+    if (Date.now() - started > FLEET_BUDGET_MS) break;
+    try {
+      const parsed = await scanWith(model, bytes);
+      return NextResponse.json({
+        merchant: String(parsed.merchant || ""),
+        total: Number(parsed.total) || 0,
+        date: parsed.date || null,
+        items: Array.isArray(parsed.items) ? parsed.items : [],
+        adjustments: Array.isArray(parsed.adjustments) ? parsed.adjustments : [],
+      });
+    } catch (e) {
+      lastError = e;
+      if (!isRetryable(e)) {
+        console.error("scan-receipt:non-retryable", model, (e as { status?: number })?.status, (e as Error)?.message);
+        return NextResponse.json({ error: "Could not read receipt — enter it manually" }, { status: 422 });
       }
     }
   }
