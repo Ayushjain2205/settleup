@@ -47,7 +47,6 @@ export function SettingsForm({ groupId }: { groupId: string }) {
   const addMember = useAddMember(groupId);
 
   const [simplifyDebts, setSimplifyDebts] = useState<boolean | null>(null);
-  const [fxMode, setFxMode] = useState<string | null>(null);
   const [fixedRate, setFixedRate] = useState("");
   const [isEditingRate, setIsEditingRate] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +62,6 @@ export function SettingsForm({ groupId }: { groupId: string }) {
   useEffect(() => {
     if (meta) {
       setSimplifyDebts(meta.simplifyDebts);
-      setFxMode(meta.fxMode);
       setFixedRate(String(meta.fxRate));
     }
   }, [meta]);
@@ -75,7 +73,7 @@ export function SettingsForm({ groupId }: { groupId: string }) {
     if (!sessionLoading && !session) router.replace("/login");
   }, [sessionLoading, session, router]);
 
-  if (sessionLoading || !session || !meta || simplifyDebts === null || fxMode === null) {
+  if (sessionLoading || !session || !meta || simplifyDebts === null) {
     return <SettingsSkeleton />;
   }
 
@@ -96,12 +94,6 @@ export function SettingsForm({ groupId }: { groupId: string }) {
     const next = !simplifyDebts;
     setSimplifyDebts(next);
     patch({ simplify_debts: next }, () => setSimplifyDebts(!next));
-  };
-
-  const changeFxMode = (mode: string) => {
-    const prev = fxMode;
-    setFxMode(mode);
-    patch({ fx_mode: mode }, () => setFxMode(prev));
   };
 
   const saveRate = async () => {
@@ -208,33 +200,35 @@ export function SettingsForm({ groupId }: { groupId: string }) {
 
         {/* Exchange Rate */}
         <div className="px-4 py-3 bg-white border-b border-[var(--border-color)]">
-          <div className="text-sm font-medium text-[var(--foreground)] mb-2">Exchange Rate</div>
-          <div className="flex gap-1 p-0.5 bg-[var(--border-color)]/30 rounded-lg mb-3">
-            <button onClick={() => changeFxMode("fixed")} className={`flex-1 py-1.5 px-2 rounded-md text-xs font-semibold transition-colors ${fxMode === "fixed" ? "bg-white text-[var(--foreground)]" : "text-[var(--muted)]"}`}>
-              Fixed
-            </button>
-            <button onClick={() => changeFxMode("live")} className={`flex-1 py-1.5 px-2 rounded-md text-xs font-semibold transition-colors ${fxMode === "live" ? "bg-white text-[var(--foreground)]" : "text-[var(--muted)]"}`}>
-              Live
-            </button>
-          </div>
-          {fxMode === "fixed" && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-[var(--muted)]">1 {meta.spendCurrency} =</span>
-              {isEditingRate ? (
-                <div className="flex items-center gap-1.5">
-                  <input type="number" step="0.01" value={fixedRate} onChange={(e) => setFixedRate(e.target.value)} className="w-20 px-2 py-1 bg-[var(--background)] border border-[var(--primary)] rounded-md text-xs focus:outline-none" />
-                  <button onClick={saveRate} className="text-[10px] text-[var(--primary)] font-semibold">Save</button>
-                </div>
-              ) : (
-                <button onClick={() => setIsEditingRate(true)} className="text-xs font-semibold text-[var(--foreground)]">
-                  {fixedRate} {meta.baseCurrency}
+          <div className="text-sm font-medium text-[var(--foreground)] mb-1">Exchange Rate</div>
+          <p className="text-[11px] text-[var(--muted)] mb-2">Changing it revalues every {meta.spendCurrency} expense in this group</p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--muted)]">1 {meta.spendCurrency} =</span>
+            {isEditingRate ? (
+              <div className="flex items-center gap-1.5 flex-1">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={fixedRate}
+                  onChange={(e) => setFixedRate(e.target.value)}
+                  autoFocus
+                  className="w-20 px-2 py-1 bg-[var(--background)] border border-[var(--primary)] rounded-md text-xs focus:outline-none"
+                />
+                <span className="text-xs text-[var(--muted)]">{meta.baseCurrency}</span>
+                <div className="flex-1" />
+                <button onClick={() => { setFixedRate(String(meta.fxRate)); setIsEditingRate(false); }} className="text-[10px] text-[var(--muted)] font-semibold px-2 py-1">
+                  Cancel
                 </button>
-              )}
-            </div>
-          )}
-          {fxMode === "live" && (
-            <p className="text-[11px] text-[var(--muted)]">Live rates aren&apos;t connected yet — expenses use a 1:1 rate for now.</p>
-          )}
+                <button onClick={saveRate} className="text-[10px] text-white font-semibold px-3 py-1.5 bg-[var(--primary)] rounded-md">
+                  Save
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setIsEditingRate(true)} className="text-xs font-semibold text-[var(--foreground)]">
+                {fixedRate} {meta.baseCurrency}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Group code */}
