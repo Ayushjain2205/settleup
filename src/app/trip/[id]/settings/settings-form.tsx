@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
 import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
@@ -32,6 +34,8 @@ function SettingsSkeleton() {
 
 export function SettingsForm({ groupId }: { groupId: string }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const supabase = createClient();
   const { data: session, isLoading: sessionLoading } = useSession();
   const ready = !sessionLoading && !!session;
   const { data: meta, isLoading: metaLoading } = useTripMeta(groupId, ready);
@@ -100,7 +104,7 @@ export function SettingsForm({ groupId }: { groupId: string }) {
     patch({ fx_mode: mode }, () => setFxMode(prev));
   };
 
-  const saveRate = () => {
+  const saveRate = async () => {
     const rate = parseFloat(fixedRate);
     if (!rate || rate <= 0) {
       setFixedRate(String(meta.fxRate));
@@ -108,7 +112,19 @@ export function SettingsForm({ groupId }: { groupId: string }) {
       return;
     }
     setIsEditingRate(false);
-    patch({ fixed_fx_rate: rate }, () => setFixedRate(String(meta.fxRate)));
+    setError(null);
+    const { error } = await supabase.rpc("revalue_group", { p_group_id: groupId, p_rate: rate });
+    if (error) {
+      setFixedRate(String(meta.fxRate));
+      setError(errorMessage(error, "Could not update rate"));
+      return;
+    }
+    success();
+    toast("Rate updated — history revalued");
+    queryClient.invalidateQueries({ queryKey: ["trip", groupId] });
+    queryClient.invalidateQueries({ queryKey: ["expenses", groupId] });
+    queryClient.invalidateQueries({ queryKey: ["settlements", groupId] });
+    queryClient.invalidateQueries({ queryKey: ["groups"] });
   };
 
   const handleCopyCode = async () => {
