@@ -184,7 +184,10 @@ export function ExpenseForm() {
       selected: selectedMembers,
       exactAmounts,
       percentages,
-      items,
+      items: items.filter((i) => (i.kind || "item") === "item"),
+      adjustments: items
+        .filter((i) => i.kind === "adjustment")
+        .map((i) => ({ name: i.name, amount: i.amount, auto: i.auto !== false, splitAmong: i.splitAmong })),
       toBase,
     });
 

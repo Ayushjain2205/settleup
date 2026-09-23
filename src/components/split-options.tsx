@@ -8,7 +8,17 @@ export interface SplitItem {
   name: string;
   amount: string;
   splitAmong: string[];
+  kind: "item" | "adjustment";
+  auto: boolean;
 }
+
+const blankItem = (members: { id: string }[]): SplitItem => ({
+  name: "",
+  amount: "",
+  splitAmong: members.map((m) => m.id),
+  kind: "item",
+  auto: false,
+});
 
 interface SplitOptionsProps {
   amount: number;
@@ -54,8 +64,19 @@ export function SplitOptions({
   const [exactAmounts, setExactAmounts] = useState<Record<string, string>>(initialExactAmounts);
   const [percentages, setPercentages] = useState<Record<string, string>>(initialPercentages);
   const [items, setItems] = useState<SplitItem[]>(
-    initialItems.length > 0 ? initialItems : [{ name: "", amount: "", splitAmong: members.map((m) => m.id) }]
+    initialItems.length > 0 ? initialItems : [blankItem(members)]
   );
+
+  // Item-only subtotals for proportional adjustment previews
+  const itemTotals = new Map<string, number>();
+  for (const item of items) {
+    if (item.kind !== "item") continue;
+    const v = parseFloat(item.amount) || 0;
+    if (item.splitAmong.length === 0) continue;
+    const share = v / item.splitAmong.length;
+    for (const id of item.splitAmong) itemTotals.set(id, (itemTotals.get(id) || 0) + share);
+  }
+  const itemsSubtotal = [...itemTotals.values()].reduce((a, b) => a + b, 0);
 
   const perPerson = selected.length > 0 ? amount / selected.length : 0;
 
@@ -192,7 +213,10 @@ export function SplitOptions({
 
           {mode === "itemized" && (
             <>
-              {items.map((item, idx) => (
+              {items.map((item, idx) => {
+                const kind = item.kind || "item";
+                if (kind === "adjustment") return null;
+                return (
                 <div key={idx} className="py-3 border-b border-[var(--border-color)]/50 space-y-2">
                   <div className="flex items-center gap-2">
                     <input
@@ -258,9 +282,10 @@ export function SplitOptions({
                     </span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               <button
-                onClick={() => setItems([...items, { name: "", amount: "", splitAmong: members.map((m) => m.id) }])}
+                onClick={() => setItems([...items, blankItem(members)])}
                 className="w-full flex items-center justify-center gap-1.5 py-3 text-sm font-medium text-[var(--primary)]"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -268,6 +293,122 @@ export function SplitOptions({
                 </svg>
                 Add item
               </button>
+              <button
+                onClick={() => setItems([...items, { name: "", amount: "", splitAmong: members.map((m) => m.id), kind: "adjustment", auto: true }])}
+                className="w-full flex items-center justify-center gap-1.5 pb-3 text-xs font-medium text-[var(--muted)]"
+              >
+                + Add tax or charge
+              </button>
+
+              {/* Adjustments (tax, tip, discount): auto-proportional or custom */}
+              {items.some((i) => (i.kind || "item") === "adjustment") && (
+                <div className="pt-1">
+                  <div className="px-0 py-2">
+                    <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Tax & charges</span>
+                  </div>
+                  {items.map((item, idx) => {
+                    if ((item.kind || "item") !== "adjustment") return null;
+                    const adjAmount = parseFloat(item.amount) || 0;
+                    return (
+                      <div key={idx} className="py-3 border-b border-[var(--border-color)]/50 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => {
+                              const newItems = [...items];
+                              newItems[idx].name = e.target.value;
+                              setItems(newItems);
+                            }}
+                            placeholder="Tax, tip, discount…"
+                            className="flex-1 text-[15px] font-medium text-[var(--foreground)] bg-transparent border-0 border-b border-[var(--border-color)] focus:border-[var(--primary)] focus:outline-none pb-1 placeholder:text-[var(--muted)]/40 transition-colors"
+                          />
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm text-[var(--muted)]">{symbol}</span>
+                            <input
+                              type="number"
+                              value={item.amount}
+                              onChange={(e) => {
+                                const newItems = [...items];
+                                newItems[idx].amount = e.target.value;
+                                setItems(newItems);
+                              }}
+                              placeholder="0"
+                              className="w-24 text-right text-[15px] font-semibold text-[var(--foreground)] bg-transparent border-0 border-b border-[var(--border-color)] focus:border-[var(--primary)] focus:outline-none pb-1 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          </div>
+                          <button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="p-1">
+                            <svg className="w-4 h-4 text-[var(--error)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1 p-0.5 bg-[var(--border-color)]/30 rounded-lg">
+                            <button
+                              onClick={() => {
+                                const newItems = [...items];
+                                newItems[idx].auto = true;
+                                setItems(newItems);
+                              }}
+                              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${item.auto ? "bg-white text-[var(--foreground)]" : "text-[var(--muted)]"}`}
+                            >
+                              Auto
+                            </button>
+                            <button
+                              onClick={() => {
+                                const newItems = [...items];
+                                newItems[idx].auto = false;
+                                setItems(newItems);
+                              }}
+                              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${!item.auto ? "bg-white text-[var(--foreground)]" : "text-[var(--muted)]"}`}
+                            >
+                              Custom
+                            </button>
+                          </div>
+                          {item.auto ? (
+                            <span className="text-[10px] text-[var(--muted)]">
+                              {itemsSubtotal > 0
+                                ? [...itemTotals.entries()]
+                                    .filter(([, sub]) => sub > 0)
+                                    .map(([id, sub]) => {
+                                      const name = members.find((m) => m.id === id)?.name || "?";
+                                      const share = (adjAmount * sub) / itemsSubtotal;
+                                      return `${name} ${symbol}${share.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+                                    })
+                                    .join(" · ") || "No shares yet"
+                                : "Splits equally (no items yet)"}
+                            </span>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {members.map((member) => (
+                                <button
+                                  key={member.id}
+                                  onClick={() => {
+                                    const newItems = [...items];
+                                    if (newItems[idx].splitAmong.includes(member.id)) {
+                                      newItems[idx].splitAmong = newItems[idx].splitAmong.filter((mid) => mid !== member.id);
+                                    } else {
+                                      newItems[idx].splitAmong = [...newItems[idx].splitAmong, member.id];
+                                    }
+                                    setItems(newItems);
+                                  }}
+                                  title={member.name}
+                                  className={`min-w-8 h-8 px-1.5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${
+                                    item.splitAmong.includes(member.id) ? "bg-[var(--primary)] text-white" : "bg-[var(--border-color)]/50 text-[var(--muted)]"
+                                  }`}
+                                >
+                                  {member.name.slice(0, 2).toUpperCase()}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
         </div>

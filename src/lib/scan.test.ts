@@ -10,7 +10,7 @@ describe("mapScanToLines", () => {
         { merchant: "Nasi Kandar", total: 100, date: null, items: [{ name: "Rice", amount: 60 }], adjustments: [] },
         MEMBERS
       )
-    ).toEqual([{ name: "Rice", amount: "60", splitAmong: MEMBERS }]);
+    ).toEqual([{ name: "Rice", amount: "60", splitAmong: MEMBERS, kind: "item", auto: false }]);
   });
 
   it("appends adjustments as ordinary shared lines", () => {
@@ -43,7 +43,7 @@ describe("mapScanToLines", () => {
       MEMBERS
     );
     expect(lines).toHaveLength(2);
-    expect(lines[1]).toEqual({ name: "Discount", amount: "-10", splitAmong: MEMBERS });
+    expect(lines[1]).toEqual({ name: "Discount", amount: "-10", splitAmong: MEMBERS, kind: "adjustment", auto: true });
   });
 
   it("drops blank names, zero items, and NaN adjustments", () => {

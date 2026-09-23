@@ -21,22 +21,25 @@ export interface FormLine {
   name: string;
   amount: string;
   splitAmong: string[];
+  kind: "item" | "adjustment";
+  /** Adjustments default to proportional (auto) distribution. */
+  auto: boolean;
 }
 
 /**
- * Map a scan to itemized form lines. Every line defaults to all members —
- * the user retargets each one (A→user1, D→everyone). Adjustments (tax, tip,
- * discounts) become ordinary lines so they stay visible and editable.
+ * Map a scan to itemized form lines. Items and adjustments both default
+ * to all members — items as equal shares, adjustments as proportional
+ * shares of the items subtotal. The user retargets each one.
  */
 export function mapScanToLines(scan: ScanResult, memberIds: string[]): FormLine[] {
   const lines: FormLine[] = [];
   for (const item of scan.items) {
     if (!item.name.trim() || !(item.amount > 0)) continue;
-    lines.push({ name: item.name.trim(), amount: String(item.amount), splitAmong: [...memberIds] });
+    lines.push({ name: item.name.trim(), amount: String(item.amount), splitAmong: [...memberIds], kind: "item", auto: false });
   }
   for (const adj of scan.adjustments) {
     if (!adj.label.trim() || adj.amount === 0 || Number.isNaN(adj.amount)) continue;
-    lines.push({ name: adj.label.trim(), amount: String(adj.amount), splitAmong: [...memberIds] });
+    lines.push({ name: adj.label.trim(), amount: String(adj.amount), splitAmong: [...memberIds], kind: "adjustment", auto: true });
   }
   return lines;
 }
