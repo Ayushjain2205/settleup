@@ -77,6 +77,7 @@ export function ExpenseForm() {
   const [hydratedId, setHydratedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scanTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastScan = useRef<Blob | null>(null);
   const saveExpense = useSaveExpense(group.id);
 
   // Create mode: default payer/selection once members arrive
@@ -195,6 +196,7 @@ export function ExpenseForm() {
     if (!canSubmit || isSubmitting) return;
     setIsSubmitting(true);
     setError(null);
+    lastScan.current = null;
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -235,14 +237,25 @@ export function ExpenseForm() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || isScanning) return;
+    try {
+      const blob = await compressImage(file);
+      await runScan(blob);
+    } catch (err) {
+      setError(errorMessage(err, "Could not read receipt"));
+      failure();
+    }
+  };
+
+  const runScan = async (blob: Blob) => {
+    if (isScanning) return;
     setIsScanning(true);
     setScanStage(0);
     setError(null);
+    lastScan.current = blob;
     scanTimer.current = setInterval(() => {
       setScanStage((s) => (s < SCAN_STAGES.length - 1 ? s + 1 : s));
     }, 2400);
     try {
-      const blob = await compressImage(file);
       const form = new FormData();
       form.append("image", blob, "receipt.jpg");
       const res = await fetch("/api/scan-receipt", { method: "POST", body: form });
@@ -259,6 +272,7 @@ export function ExpenseForm() {
         setSplitMode("itemized");
         setShowSplitOptions(true);
       }
+      lastScan.current = null;
       success();
     } catch (err) {
       setError(errorMessage(err, "Could not read receipt"));
@@ -430,7 +444,14 @@ export function ExpenseForm() {
         </div>
 
         {error && (
-          <p className="text-xs font-medium text-[var(--error)] bg-[var(--error)]/5 border border-[var(--error)]/20 rounded-xl px-4 py-2.5 mt-4">{error}</p>
+          <div className="flex items-center justify-between gap-3 bg-[var(--error)]/5 border border-[var(--error)]/20 rounded-xl px-4 py-2.5 mt-4">
+            <p className="text-xs font-medium text-[var(--error)] flex-1">{error}</p>
+            {lastScan.current && !isScanning && (
+              <button onClick={() => runScan(lastScan.current!)} className="text-xs font-bold text-[var(--primary)] flex-shrink-0">
+                Retry
+              </button>
+            )}
+          </div>
         )}
 
         {isScanning && (
