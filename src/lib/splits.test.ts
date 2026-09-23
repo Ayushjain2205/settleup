@@ -33,6 +33,7 @@ describe("computeSplitOwes", () => {
       exactAmounts: {},
       percentages: {},
       items: [],
+      adjustments: [],
       toBase: identity,
     });
     expect(result).toEqual([
