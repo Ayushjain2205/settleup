@@ -1,94 +1,80 @@
 import { NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
 
 const DEFAULT_MODELS = [
-  "gemini-3.6-flash",
-  "gemini-3.8-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-2.5-flash-lite",
+  "google/gemini-3.6-flash",
+  "google/gemini-3.8-flash",
 ];
 
 function modelFleet(): string[] {
-  const models = (process.env.GEMINI_MODELS || "")
+  const models = (process.env.OPENROUTER_MODELS || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  for (const legacy of [process.env.GEMINI_MODEL, process.env.GEMINI_FALLBACK_MODEL]) {
-    if (legacy && !models.includes(legacy)) {
-      if (legacy === process.env.GEMINI_MODEL) models.unshift(legacy);
-      else models.push(legacy);
-    }
-  }
   return models.length > 0 ? [...new Set(models)] : DEFAULT_MODELS;
 }
 
-// Hobby functions die at 10s — fail fast across the fleet instead of
-// long backoffs. Total budget for model calls: ~8s.
+// Hobby functions die at 10s — fail fast across the fleet.
 const FLEET_BUDGET_MS = 8000;
 
-const SCHEMA = {
-  type: "object",
-  properties: {
-    merchant: { type: "string" },
-    total: { type: "number" },
-    date: { type: "string", description: "Receipt date as YYYY-MM-DD, or empty string if unreadable" },
-    items: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          amount: { type: "number" },
-        },
-        required: ["name", "amount"],
-      },
-    },
-    adjustments: {
-      type: "array",
-      description: "Tax, tip, service charge (positive) and discounts (negative)",
-      items: {
-        type: "object",
-        properties: {
-          label: { type: "string" },
-          amount: { type: "number", description: "Negative for discounts" },
-        },
-        required: ["label", "amount"],
-      },
-    },
-  },
-  required: ["merchant", "total", "items", "adjustments"],
-} as const;
+const SYSTEM_PROMPT = `Read this receipt. Amounts are in the receipt's own currency — return them as printed, no conversion.
+Return ONLY a JSON object with this exact shape:
+{"merchant": "string", "total": number, "date": "YYYY-MM-DD or empty string", "items": [{"name": "string", "amount": number}], "adjustments": [{"label": "string", "amount": number (negative for discounts)}]}
+Tax, tip, and service charge go in adjustments (positive). Discounts go in adjustments (negative).`;
 
-function isRetryable(e: unknown): boolean {
-  const status = (e as { status?: number })?.status;
-  return status === 429 || status === 503;
+function isRetryable(status: number | undefined): boolean {
+  return status === 429 || (status !== undefined && status >= 500);
+}
+
+function stripFences(text: string): string {
+  const t = text.trim();
+  if (t.startsWith("```")) {
+    return t.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  }
+  return t;
 }
 
 async function scanWith(model: string, bytes: string) {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-  const res = await ai.models.generateContent({
-    model,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: "Read this receipt. Amounts are in the receipt's own currency — return them as printed, no conversion. Return ONLY JSON matching the schema.",
-          },
-          { inlineData: { mimeType: "image/jpeg", data: bytes } },
-        ],
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 9000);
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY!}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://settleup-eb.vercel.app",
+        "X-Title": "SettleUp",
       },
-    ],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: SCHEMA,
-    },
-  });
-  return JSON.parse(res.text || "{}");
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: SYSTEM_PROMPT },
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${bytes}` } },
+            ],
+          },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) {
+      const err = new Error(`OpenRouter ${res.status}`) as Error & { status?: number };
+      err.status = res.status;
+      throw err;
+    }
+    const body = await res.json();
+    const text: string = body?.choices?.[0]?.message?.content || "{}";
+    return JSON.parse(stripFences(text));
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function POST(request: Request) {
-  if (!process.env.GEMINI_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY) {
     return NextResponse.json({ error: "Receipt scanning is not configured" }, { status: 503 });
   }
 
@@ -124,8 +110,9 @@ export async function POST(request: Request) {
       });
     } catch (e) {
       lastError = e;
-      if (!isRetryable(e)) {
-        console.error("scan-receipt:non-retryable", model, (e as { status?: number })?.status, (e as Error)?.message);
+      const status = (e as { status?: number })?.status;
+      if (status !== undefined && !isRetryable(status)) {
+        console.error("scan-receipt:non-retryable", model, status, (e as Error)?.message);
         return NextResponse.json({ error: "Could not read receipt — enter it manually" }, { status: 422 });
       }
     }
