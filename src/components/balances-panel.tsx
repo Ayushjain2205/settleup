@@ -12,22 +12,34 @@ interface SpendingProps {
   expenses: Expense[];
   members: Member[];
   currency: string;
+  baseCurrency: string;
+  fxRate: number;
+  splitDetails: Record<string, { memberId: string; amount: number }[]>;
 }
 
-function Spending({ expenses, members, currency }: SpendingProps) {
+export function Spending({ expenses, members, currency, baseCurrency, fxRate, splitDetails }: SpendingProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const toDisplay = (base: number) => (currency === baseCurrency ? base : Math.round((base / (fxRate || 1)) * 100) / 100);
 
   const totals = members.map((m, i) => ({
     member: m,
     color: SLICES[i % SLICES.length],
-    total: expenses.filter((e) => e.paidBy === m.id).reduce((s, e) => s + e.baseAmount, 0),
+    total: toDisplay(
+      expenses.reduce((s, e) => s + (splitDetails[e.id] || []).filter((x) => x.memberId === m.id).reduce((a, x) => a + x.amount, 0), 0)
+    ),
   }));
   const grand = totals.reduce((s, t) => s + t.total, 0);
   if (grand <= 0) return null;
 
   const selected = selectedId ? totals.find((t) => t.member.id === selectedId) : null;
-  const selectedExpenses = selectedId
-    ? expenses.filter((e) => e.paidBy === selectedId).sort((a, b) => b.date.localeCompare(a.date))
+  const selectedRows = selectedId
+    ? expenses
+        .map((e) => ({
+          expense: e,
+          share: toDisplay((splitDetails[e.id] || []).filter((x) => x.memberId === selectedId).reduce((a, x) => a + x.amount, 0)),
+        }))
+        .filter((r) => r.share > 0)
+        .sort((a, b) => b.expense.date.localeCompare(a.expense.date))
     : [];
 
   // SVG doughnut: r=15.9155 → circumference 100, offsets accumulate
@@ -101,19 +113,19 @@ function Spending({ expenses, members, currency }: SpendingProps) {
             </button>
           </div>
           <div className="divide-y divide-[var(--border-color)]/60">
-            {selectedExpenses.map((e) => (
+            {selectedRows.map(({ expense: e, share }) => (
               <div key={e.id} className="flex items-center gap-3 px-4 py-2">
                 <span className="flex-1 text-xs font-medium text-[var(--foreground)] truncate">{e.title}</span>
                 <span className="text-[10px] text-[var(--muted)]">
                   {new Date(e.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </span>
                 <span className="text-xs font-semibold text-[var(--foreground)] tabular-nums">
-                  {symbol(currency)}{e.baseAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  {symbol(currency)}{share.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
               </div>
             ))}
-            {selectedExpenses.length === 0 && (
-              <div className="px-4 py-3 text-[11px] text-[var(--muted)]">No expenses paid yet</div>
+            {selectedRows.length === 0 && (
+              <div className="px-4 py-3 text-[11px] text-[var(--muted)]">No share in any expense yet</div>
             )}
           </div>
         </div>
@@ -125,21 +137,16 @@ function Spending({ expenses, members, currency }: SpendingProps) {
 interface BalancesPanelProps {
   balances: Balance[];
   members: Member[];
-  expenses?: Expense[];
 }
 
-export function BalancesPanel({ balances, members, expenses }: BalancesPanelProps) {
+export function BalancesPanel({ balances, members }: BalancesPanelProps) {
   const getMember = (id: string) => members.find((m) => m.id === id);
 
   const sorted = [...balances].sort((a, b) => b.amount - a.amount);
   const maxAbs = Math.max(...sorted.map((b) => Math.abs(b.amount)), 1);
-  const currency = balances[0]?.currency || "INR";
 
   return (
     <div>
-      {expenses && expenses.length > 0 && (
-        <Spending expenses={expenses} members={members} currency={currency} />
-      )}
       {/* Summary bar */}
       <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-[var(--border-color)]">
         <span className="text-xs text-[var(--muted)]">Net balances</span>
