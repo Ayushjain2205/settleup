@@ -30,6 +30,8 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
   const recordSettlement = useRecordSettlement(groupId);
   const [recording, setRecording] = useState<string | null>(null);
   const [recordedIds, setRecordedIds] = useState<Set<string>>(new Set());
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   // Server data caught up — drop optimistic marks
@@ -41,13 +43,19 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
 
   const getMember = (id: string) => members.find((m) => m.id === id);
 
-  const handleRecord = (s: Settlement, key: string) => {
+  const handleRecord = (s: Settlement, key: string, amountOverride?: number) => {
+    const amount = amountOverride ?? s.amount;
+    if (!(amount > 0)) {
+      setError("Enter an amount greater than zero");
+      return;
+    }
     setRecording(key);
     setError(null);
     setRecordedIds((prev) => new Set(prev).add(key));
+    setEditingKey(null);
     success();
     recordSettlement.mutate(
-      { from: s.from, to: s.to, amount: s.amount, currency: s.currency },
+      { from: s.from, to: s.to, amount: Math.round(amount * 100) / 100, currency: s.currency },
       {
         onSuccess: () => toast("Payment recorded"),
         onError: (err) => {
@@ -125,16 +133,59 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
                   </div>
 
                   <button
-                    onClick={() => handleRecord(s, key)}
+                    onClick={() => {
+                      setEditingKey(key);
+                      setEditAmount(String(s.amount));
+                    }}
                     disabled={recording !== null}
                     className="px-3 py-1.5 rounded-lg bg-[var(--primary)]/10 text-xs font-semibold text-[var(--primary)] active:bg-[var(--primary)]/20 transition-colors disabled:opacity-40 flex-shrink-0"
                   >
-                    {recording === key ? "..." : "Record"}
+                    Record
                   </button>
                 </div>
               );
             })}
           </div>
+
+          {/* Amount editor sheet */}
+          {editingKey && (() => {
+            const s = visible.find((x) => `${x.from}-${x.to}-${x.amount}` === editingKey);
+            if (!s) return null;
+            return (
+              <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={() => setEditingKey(null)}>
+                <div className="absolute inset-0 bg-black/40" />
+                <div
+                  className="relative w-full bg-white rounded-t-2xl px-4 pt-4 flex flex-col overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ paddingBottom: "calc(16px + var(--safe-bottom))" }}
+                >
+                  <div className="text-sm font-semibold text-[var(--foreground)] text-center">
+                    {getMember(s.from)?.name} → {getMember(s.to)?.name}
+                  </div>
+                  <p className="text-[11px] text-[var(--muted)] text-center mt-0.5 mb-4">
+                    Suggested {symbol(s.currency)}{s.amount.toLocaleString()} · edit what was actually paid
+                  </p>
+                  <div className="flex items-center justify-center gap-1.5 mb-4">
+                    <span className="text-xl font-semibold text-[var(--muted)]">{symbol(s.currency)}</span>
+                    <input
+                      type="number"
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(e.target.value)}
+                      autoFocus
+                      className="w-40 text-center text-3xl font-bold text-[var(--foreground)] bg-transparent border-0 border-b-2 border-[var(--primary)] focus:outline-none pb-1 placeholder:text-[var(--border-color)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleRecord(s, editingKey, parseFloat(editAmount) || 0)}
+                    disabled={recording !== null}
+                    className="w-full py-3 bg-[var(--primary)] text-white rounded-xl text-sm font-semibold active:opacity-80 transition-opacity disabled:opacity-40"
+                  >
+                    {recording === editingKey ? "Recording…" : "Confirm payment"}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </>
       )}
 
