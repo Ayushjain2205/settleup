@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeBalances, simplifyDebts } from "./settlements";
+import { computeBalances, pairwiseDebts, simplifyDebts } from "./settlements";
 
 describe("computeBalances", () => {
   it("nets paid minus owed per member", () => {
@@ -106,8 +106,7 @@ describe("simplifyDebts", () => {
     ).toEqual([]);
   });
 
-  it("ignores dust under a paisa", () => {
-    const result = simplifyDebts(
+  it("ignores dust under a paisa", () => {    const result = simplifyDebts(
       [
         { memberId: "a", amount: 0.005, currency: "INR" },
         { memberId: "b", amount: -0.005, currency: "INR" },
@@ -115,5 +114,28 @@ describe("simplifyDebts", () => {
       "INR"
     );
     expect(result).toEqual([]);
+  });
+});
+
+describe("pairwiseDebts", () => {
+  it("aggregates per debtor-payer pair without netting", () => {
+    expect(
+      pairwiseDebts(
+        [
+          { paidBy: "a", splits: [{ memberId: "a", amountOwed: 30 }, { memberId: "b", amountOwed: 30 }] },
+          { paidBy: "b", splits: [{ memberId: "a", amountOwed: 10 }, { memberId: "b", amountOwed: 10 }] },
+        ],
+        "INR"
+      )
+    ).toEqual([
+      { from: "b", to: "a", amount: 30, currency: "INR" },
+      { from: "a", to: "b", amount: 10, currency: "INR" },
+    ]);
+  });
+
+  it("skips self-pairs and dust", () => {
+    expect(
+      pairwiseDebts([{ paidBy: "a", splits: [{ memberId: "a", amountOwed: 50 }] }], "INR")
+    ).toEqual([]);
   });
 });

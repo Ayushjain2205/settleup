@@ -11,7 +11,7 @@ import { ExpensesList } from "@/components/expenses-list";
 import { BalancesPanel } from "@/components/balances-panel";
 import { SettleTab } from "@/components/settle-tab";
 import { useExpenses, useMembers, useRecorded } from "@/lib/queries";
-import { computeBalances, simplifyDebts, applyRecorded } from "@/lib/settlements";
+import { applyRecorded, computeBalances, simplifyDebts } from "@/lib/settlements";
 
 type Tab = "expenses" | "balances" | "settle";
 
@@ -107,7 +107,32 @@ function SettlePane({ groupId, display, simplify }: { groupId: string; display: 
       currency === display.baseCurrency ? amount : round2(amount * (display.fxRate || 1));
     const baseRecorded = recorded.map((r) => ({ from: r.from, to: r.to, date: r.date, amount: toBase(r.amount, r.currency) }));
     const settled = applyRecorded(b, baseRecorded);
-    const plan = simplify ? simplifyDebts(settled, display.baseCurrency) : [];
+    let plan: { from: string; to: string; amount: number; currency: string }[];
+    if (simplify) {
+      plan = simplifyDebts(settled, display.baseCurrency);
+    } else {
+      // Unsimplified: raw pairs minus what's already recorded per pair
+      // (overpayment flips direction instead of vanishing).
+      const pairTotals = new Map<string, number>();
+      for (const e of data.expenses) {
+        for (const x of data.splitDetails[e.id] || []) {
+          if (x.memberId === e.paidBy || x.amount < 0.01) continue;
+          const key = `${x.memberId}→${e.paidBy}`;
+          pairTotals.set(key, (pairTotals.get(key) || 0) + x.amount);
+        }
+      }
+      for (const r of baseRecorded) {
+        const key = `${r.from}→${r.to}`;
+        const rest = (pairTotals.get(key) || 0) - r.amount;
+        pairTotals.delete(key);
+        if (rest > 0.009) pairTotals.set(key, rest);
+        else if (rest < -0.009) pairTotals.set(`${r.to}→${r.from}`, -rest);
+      }
+      plan = [...pairTotals.entries()].map(([key, amount]) => {
+        const [from, to] = key.split("→");
+        return { from, to, amount: Math.round(amount * 100) / 100, currency: display.baseCurrency };
+      });
+    }
     const show = (v: number) => display.show(v);
     return {
       balances: b,
@@ -118,7 +143,7 @@ function SettlePane({ groupId, display, simplify }: { groupId: string; display: 
   if (loading || isLoading || membersLoading || recordedLoading || !settlements || !shownRecorded || !members) {
     return <TabFallback />;
   }
-  return <SettleTab groupId={groupId} settlements={settlements} recorded={shownRecorded} members={members} />;
+  return <SettleTab groupId={groupId} settlements={settlements} recorded={shownRecorded} members={members} simplified={simplify} />;
 }
 
 interface TripShellProps {

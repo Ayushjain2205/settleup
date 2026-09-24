@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useRecordSettlement } from "@/lib/mutations";
+import { useRecordSettlement, useUpdateGroup } from "@/lib/mutations";
 import { errorMessage } from "@/lib/error";
 import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
@@ -21,13 +21,15 @@ interface SettleTabProps {
   settlements: Settlement[];
   recorded: RecordedPayment[];
   members: Member[];
+  simplified: boolean;
 }
 
 const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
 
-export function SettleTab({ groupId, settlements, recorded, members }: SettleTabProps) {
+export function SettleTab({ groupId, settlements, recorded, members, simplified }: SettleTabProps) {
   const router = useRouter();
   const recordSettlement = useRecordSettlement(groupId);
+  const updateGroup = useUpdateGroup(groupId);
   const [recording, setRecording] = useState<string | null>(null);
   const [recordedIds, setRecordedIds] = useState<Set<string>>(new Set());
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -42,6 +44,24 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
   const visible = settlements.filter((s) => !recordedIds.has(`${s.from}-${s.to}-${s.amount}`));
 
   const getMember = (id: string) => members.find((m) => m.id === id);
+
+  const handleToggleMode = () => {
+    const toSimplified = !simplified;
+    const ok = window.confirm(
+      toSimplified
+        ? "Switch to simplified debts? Payments collapse to the fewest transfers. Balances stay exactly the same."
+        : "Switch to unsimplified debts? Every debtor settles directly with each payer — more payments, fully transparent. Balances stay exactly the same."
+    );
+    if (!ok) return;
+    setError(null);
+    updateGroup.mutate(
+      { simplify_debts: toSimplified },
+      {
+        onSuccess: () => toast(simplified ? "Showing all debts" : "Debts simplified"),
+        onError: (err) => setError(errorMessage(err, "Could not switch mode")),
+      }
+    );
+  };
 
   const handleRecord = (s: Settlement, key: string, amountOverride?: number) => {
     const amount = amountOverride ?? s.amount;
@@ -101,7 +121,9 @@ export function SettleTab({ groupId, settlements, recorded, members }: SettleTab
           <div className="px-4 py-3 bg-white border-b border-[var(--border-color)]">
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--muted)]">{visible.length} payment{visible.length !== 1 ? "s" : ""} needed</span>
-              <span className="text-xs font-medium text-[var(--primary)]">Simplified</span>
+              <button onClick={handleToggleMode} className="text-xs font-medium text-[var(--primary)]">
+                {simplified ? "Simplified" : "All debts"} · tap to switch
+              </button>
             </div>
           </div>
 

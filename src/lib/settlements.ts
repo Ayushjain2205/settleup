@@ -48,8 +48,27 @@ export function applyRecorded(
   });
 }
 
-/** Greedy min-cash-flow: fewest transfers to settle all debts. */
-export function simplifyDebts(balances: Balance[], currency: string): { from: string; to: string; amount: number; currency: string }[] {
+/** Unsimplified view: every debtor settles directly with each payer,
+ *  aggregated per pair. Self-pairs (payer owing themselves) are skipped. */
+export function pairwiseDebts(
+  items: { paidBy: string; splits: { memberId: string; amountOwed: number }[] }[],
+  currency: string
+): { from: string; to: string; amount: number; currency: string }[] {
+  const totals = new Map<string, number>();
+  for (const item of items) {
+    for (const s of item.splits) {
+      if (s.memberId === item.paidBy || s.amountOwed < 0.01) continue;
+      const key = `${s.memberId}→${item.paidBy}`;
+      totals.set(key, (totals.get(key) || 0) + s.amountOwed);
+    }
+  }
+  return [...totals.entries()].map(([key, amount]) => {
+    const [from, to] = key.split("→");
+    return { from, to, amount: Math.round(amount * 100) / 100, currency };
+  });
+}
+
+/** Greedy min-cash-flow: fewest transfers to settle all debts. */export function simplifyDebts(balances: Balance[], currency: string): { from: string; to: string; amount: number; currency: string }[] {
   const creditors = balances
     .filter((b) => b.amount > 0.009)
     .map((b) => ({ ...b }))
