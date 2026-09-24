@@ -177,7 +177,7 @@ export function SettleTab({ groupId, settlements, recorded, members, simplified 
               <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={() => setEditingKey(null)}>
                 <div className="absolute inset-0 bg-black/40" />
                 <div
-                  className="relative w-full bg-white rounded-t-2xl px-4 pt-4 flex flex-col overflow-hidden"
+                  className="relative w-full bg-white rounded-t-2xl px-4 pt-4 flex flex-col overflow-y-auto max-h-[70vh]"
                   onClick={(e) => e.stopPropagation()}
                   style={{ paddingBottom: "calc(16px + var(--safe-bottom))" }}
                 >
