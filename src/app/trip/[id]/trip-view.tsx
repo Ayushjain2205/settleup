@@ -93,7 +93,12 @@ function SettlePane({ groupId, display, simplify }: { groupId: string; display: 
     const paid = data.expenses.map((e) => ({ paidBy: e.paidBy, baseAmount: e.baseAmount }));
     const splits = Object.values(data.splitDetails).flat().map((x) => ({ memberId: x.memberId, amountOwed: x.amount }));
     const b = computeBalances(memberIds, paid, splits, display.baseCurrency);
-    for (const r of recorded) {
+    // Recorded payments settle in their own currency — normalize to base
+    // before adjusting, or foreign amounts barely dent the plan.
+    const toBase = (amount: number, currency: string) =>
+      currency === display.baseCurrency ? amount : round2(amount * (display.fxRate || 1));
+    const baseRecorded = recorded.map((r) => ({ ...r, amount: toBase(r.amount, r.currency), currency: display.baseCurrency }));
+    for (const r of baseRecorded) {
       const from = b.find((x) => x.memberId === r.from);
       const to = b.find((x) => x.memberId === r.to);
       if (from) from.amount = Math.round((from.amount + r.amount) * 100) / 100;
@@ -104,7 +109,7 @@ function SettlePane({ groupId, display, simplify }: { groupId: string; display: 
     return {
       balances: b,
       settlements: plan.map((s) => ({ ...s, amount: show(s.amount), currency: display.code })),
-      shownRecorded: recorded.map((r) => ({ ...r, amount: show(r.amount), currency: display.code })),
+      shownRecorded: baseRecorded.map((r) => ({ ...r, amount: show(r.amount), currency: display.code })),
     };
   }, [data, members, recorded, display, simplify]);
   if (loading || isLoading || membersLoading || recordedLoading || !settlements || !shownRecorded || !members) {
