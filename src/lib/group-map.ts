@@ -4,8 +4,8 @@ interface GroupRow {
   id: string;
   name: string;
   base_currency: string;
-  group_members: { id: string; avatar: string }[] | null;
-  expenses: { base_amount: string | number; expense_date: string | null }[] | null;
+  group_members: { id: string; avatar: string; name?: string; user_id?: string | null }[] | null;
+  expenses: { id?: string; base_amount: string | number; expense_date: string | null; paid_by?: string }[] | null;
 }
 
 export function mapGroupRows(rows: GroupRow[]): GroupListItem[] {

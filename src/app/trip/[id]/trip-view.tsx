@@ -11,7 +11,7 @@ import { ExpensesList } from "@/components/expenses-list";
 import { BalancesPanel } from "@/components/balances-panel";
 import { SettleTab } from "@/components/settle-tab";
 import { useExpenses, useMembers, useRecorded } from "@/lib/queries";
-import { computeBalances, simplifyDebts } from "@/lib/settlements";
+import { computeBalances, simplifyDebts, applyRecorded } from "@/lib/settlements";
 
 type Tab = "expenses" | "balances" | "settle";
 
@@ -67,18 +67,26 @@ function BalancesPane({ groupId, display }: { groupId: string; display: DisplayC
   const { ready, loading } = useReady();
   const { data, isLoading } = useExpenses(groupId, display.baseCurrency, ready);
   const { data: members, isLoading: membersLoading } = useMembers(groupId, ready);
+  const { data: recorded, isLoading: recordedLoading } = useRecorded(groupId, ready);
   const balances = useMemo(() => {
-    if (!data || !members) return null;
+    if (!data || !members || !recorded) return null;
     const memberIds = members.map((m) => m.id);
     const paid = data.expenses.map((e) => ({ paidBy: e.paidBy, baseAmount: e.baseAmount }));
     const splits = Object.values(data.splitDetails).flat().map((x) => ({ memberId: x.memberId, amountOwed: x.amount }));
-    return computeBalances(memberIds, paid, splits, display.baseCurrency).map((b) => ({
+    const raw = computeBalances(memberIds, paid, splits, display.baseCurrency);
+    const toBase = (amount: number, currency: string) =>
+      currency === display.baseCurrency ? amount : round2(amount * (display.fxRate || 1));
+    const settled = applyRecorded(
+      raw,
+      recorded.map((r) => ({ from: r.from, to: r.to, amount: toBase(r.amount, r.currency) }))
+    );
+    return settled.map((b) => ({
       ...b,
       amount: display.show(b.amount),
       currency: display.code,
     }));
-  }, [data, members, display]);
-  if (loading || isLoading || membersLoading || !balances || !members) return <TabFallback />;
+  }, [data, members, recorded, display]);
+  if (loading || isLoading || membersLoading || recordedLoading || !balances || !members) return <TabFallback />;
   return <BalancesPanel balances={balances} members={members} />;
 }
 
@@ -97,14 +105,9 @@ function SettlePane({ groupId, display, simplify }: { groupId: string; display: 
     // before adjusting, or foreign amounts barely dent the plan.
     const toBase = (amount: number, currency: string) =>
       currency === display.baseCurrency ? amount : round2(amount * (display.fxRate || 1));
-    const baseRecorded = recorded.map((r) => ({ ...r, amount: toBase(r.amount, r.currency), currency: display.baseCurrency }));
-    for (const r of baseRecorded) {
-      const from = b.find((x) => x.memberId === r.from);
-      const to = b.find((x) => x.memberId === r.to);
-      if (from) from.amount = Math.round((from.amount + r.amount) * 100) / 100;
-      if (to) to.amount = Math.round((to.amount - r.amount) * 100) / 100;
-    }
-    const plan = simplify ? simplifyDebts(b, display.baseCurrency) : [];
+    const baseRecorded = recorded.map((r) => ({ from: r.from, to: r.to, amount: toBase(r.amount, r.currency) }));
+    const settled = applyRecorded(b, baseRecorded);
+    const plan = simplify ? simplifyDebts(settled, display.baseCurrency) : [];
     const show = (v: number) => display.show(v);
     return {
       balances: b,

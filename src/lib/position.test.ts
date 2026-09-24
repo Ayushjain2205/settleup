@@ -19,8 +19,10 @@ describe("computePosition", () => {
           { memberId: "m2", amountOwed: 30 },
           { memberId: "m3", amountOwed: 30 },
         ],
+        recorded: [],
         simplify: true,
         currency: "INR",
+        fxRate: 1,
         currentUserId: "u2",
       },
       // names resolved separately; use ids as names via members without names
@@ -41,6 +43,8 @@ describe("computePosition", () => {
         { memberId: "m2", amountOwed: 30 },
         { memberId: "m3", amountOwed: 30 },
       ],
+      recorded: [],
+      fxRate: 1,
       simplify: true,
       currency: "INR",
       currentUserId: "u1",
@@ -55,6 +59,8 @@ describe("computePosition", () => {
       members: MEMBERS,
       expenses: [],
       splits: [],
+      recorded: [],
+      fxRate: 1,
       simplify: true,
       currency: "INR",
       currentUserId: "u1",
@@ -69,6 +75,8 @@ describe("computePosition", () => {
       members: MEMBERS,
       expenses: [{ paidBy: "m1", baseAmount: 100 }],
       splits: [{ memberId: "m1", amountOwed: 100 }],
+      recorded: [],
+      fxRate: 1,
       simplify: true,
       currency: "INR",
       currentUserId: "stranger",
@@ -88,11 +96,36 @@ describe("computePosition", () => {
         { memberId: "m1", amountOwed: 50 },
         { memberId: "m2", amountOwed: 50 },
       ],
+      recorded: [],
+      fxRate: 1,
       simplify: true,
       currency: "INR",
       currentUserId: "u1",
     });
     expect(pos.net).toBe(-50);
     expect(pos.iOwe[0].amount).toBe(50);
+  });
+
+  it("normalizes foreign recorded payments to base before adjusting", () => {
+    // m1 owes 50; pays 2 USD @25 → settled
+    const pos = computePosition({
+      members: [
+        { id: "m1", userId: "u1", name: "Ayush" },
+        { id: "m2", userId: "u2", name: "Priya" },
+      ],
+      expenses: [{ paidBy: "m2", baseAmount: 100 }],
+      splits: [
+        { memberId: "m1", amountOwed: 50 },
+        { memberId: "m2", amountOwed: 50 },
+      ],
+      recorded: [{ from: "m1", to: "m2", amount: 2, currency: "USD" }],
+      fxRate: 25,
+      simplify: true,
+      currency: "INR",
+      currentUserId: "u1",
+    });
+    expect(pos.net).toBe(0);
+    expect(pos.iOwe).toEqual([]);
+    expect(pos.owesMe).toEqual([]);
   });
 });

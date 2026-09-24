@@ -78,18 +78,28 @@ export function useGroups() {
     queryFn: async (): Promise<GroupListItem[]> => {
       const { data: groups, error } = await supabase
         .from("groups")
-        .select("id, name, base_currency, simplify_debts, group_members(id, name, avatar, user_id), expenses(id, base_amount, expense_date, paid_by)")
+        .select("id, name, base_currency, fixed_fx_rate, simplify_debts, group_members(id, name, avatar, user_id), expenses(id, base_amount, expense_date, paid_by)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       const ids = (groups || []).map((g) => g.id);
       let splitRows: { expense_id: string; member_id: string; amount_owed: string | number }[] = [];
+      let recordedRows: { group_id: string; from_member: string; to_member: string; amount: string | number; currency: string }[] = [];
       if (ids.length > 0) {
-        const { data, error: splitError } = await supabase
-          .from("expense_splits")
-          .select("expense_id, member_id, amount_owed, expenses!inner(group_id)")
-          .in("expenses.group_id", ids);
+        const [{ data: splits, error: splitError }, { data: settled, error: settledError }] = await Promise.all([
+          supabase
+            .from("expense_splits")
+            .select("expense_id, member_id, amount_owed, expenses!inner(group_id)")
+            .in("expenses.group_id", ids),
+          supabase
+            .from("settlements")
+            .select("group_id, from_member, to_member, amount, currency")
+            .in("group_id", ids)
+            .eq("status", "confirmed"),
+        ]);
         if (splitError) throw splitError;
-        splitRows = data || [];
+        if (settledError) throw settledError;
+        splitRows = splits || [];
+        recordedRows = settled || [];
       }
       const splitsByExpense = new Map<string, { memberId: string; amountOwed: number }[]>();
       for (const s of splitRows) {
@@ -107,8 +117,12 @@ export function useGroups() {
               members: (raw.group_members || []).map((m) => ({ id: m.id, userId: m.user_id, name: m.name })),
               expenses: expenses.map((e) => ({ paidBy: e.paid_by, baseAmount: Number(e.base_amount) })),
               splits: expenses.flatMap((e) => splitsByExpense.get(e.id) || []),
+              recorded: (recordedRows || [])
+                .filter((r) => r.group_id === g.id)
+                .map((r) => ({ from: r.from_member, to: r.to_member, amount: Number(r.amount), currency: r.currency })),
               simplify: raw.simplify_debts,
               currency: g.baseCurrency,
+              fxRate: Number(raw.fixed_fx_rate) || 1,
               currentUserId: userId || "",
             }
           ),

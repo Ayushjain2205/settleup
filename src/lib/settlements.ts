@@ -32,6 +32,22 @@ export function computeBalances(
   }));
 }
 
+/** Fold confirmed payments into balances: payer owes less,
+ *  receiver is owed less. Amounts must share the balances' currency. */
+export function applyRecorded(
+  balances: Balance[],
+  recorded: { from: string; to: string; amount: number }[]
+): Balance[] {
+  return balances.map((b) => {
+    let amount = b.amount;
+    for (const r of recorded) {
+      if (r.from === b.memberId) amount = Math.round((amount + r.amount) * 100) / 100;
+      if (r.to === b.memberId) amount = Math.round((amount - r.amount) * 100) / 100;
+    }
+    return { ...b, amount };
+  });
+}
+
 /** Greedy min-cash-flow: fewest transfers to settle all debts. */
 export function simplifyDebts(balances: Balance[], currency: string): { from: string; to: string; amount: number; currency: string }[] {
   const creditors = balances
