@@ -122,7 +122,7 @@ export function SettleTab({ groupId, settlements, recorded, members, simplified 
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--muted)]">{visible.length} payment{visible.length !== 1 ? "s" : ""} needed</span>
               <button onClick={handleToggleMode} className="text-xs font-medium text-[var(--primary)]">
-                {simplified ? "Simplified" : "All debts"} · tap to switch
+                {simplified ? "Simplified" : "All debts"}
               </button>
             </div>
           </div>
