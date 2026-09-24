@@ -105,7 +105,7 @@ function SettlePane({ groupId, display, simplify }: { groupId: string; display: 
     // before adjusting, or foreign amounts barely dent the plan.
     const toBase = (amount: number, currency: string) =>
       currency === display.baseCurrency ? amount : round2(amount * (display.fxRate || 1));
-    const baseRecorded = recorded.map((r) => ({ from: r.from, to: r.to, amount: toBase(r.amount, r.currency) }));
+    const baseRecorded = recorded.map((r) => ({ from: r.from, to: r.to, date: r.date, amount: toBase(r.amount, r.currency) }));
     const settled = applyRecorded(b, baseRecorded);
     const plan = simplify ? simplifyDebts(settled, display.baseCurrency) : [];
     const show = (v: number) => display.show(v);
