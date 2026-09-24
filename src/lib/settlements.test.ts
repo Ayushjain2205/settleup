@@ -118,7 +118,7 @@ describe("simplifyDebts", () => {
 });
 
 describe("pairwiseDebts", () => {
-  it("aggregates per debtor-payer pair without netting", () => {
+  it("nets opposite directions into a single delta per pair", () => {
     expect(
       pairwiseDebts(
         [
@@ -127,10 +127,7 @@ describe("pairwiseDebts", () => {
         ],
         "INR"
       )
-    ).toEqual([
-      { from: "b", to: "a", amount: 30, currency: "INR" },
-      { from: "a", to: "b", amount: 10, currency: "INR" },
-    ]);
+    ).toEqual([{ from: "b", to: "a", amount: 20, currency: "INR" }]);
   });
 
   it("skips self-pairs and dust", () => {

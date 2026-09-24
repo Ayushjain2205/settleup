@@ -48,24 +48,34 @@ export function applyRecorded(
   });
 }
 
-/** Unsimplified view: every debtor settles directly with each payer,
- *  aggregated per pair. Self-pairs (payer owing themselves) are skipped. */
+/** Unsimplified view: net balance per pair across the group (no
+ *  cross-pair netting). Opposite directions collapse to the delta —
+ *  a pair never shows both ways. Self-pairs are skipped. */
 export function pairwiseDebts(
   items: { paidBy: string; splits: { memberId: string; amountOwed: number }[] }[],
   currency: string
 ): { from: string; to: string; amount: number; currency: string }[] {
-  const totals = new Map<string, number>();
+  const directed = new Map<string, number>();
   for (const item of items) {
     for (const s of item.splits) {
       if (s.memberId === item.paidBy || s.amountOwed < 0.01) continue;
       const key = `${s.memberId}→${item.paidBy}`;
-      totals.set(key, (totals.get(key) || 0) + s.amountOwed);
+      directed.set(key, (directed.get(key) || 0) + s.amountOwed);
     }
   }
-  return [...totals.entries()].map(([key, amount]) => {
-    const [from, to] = key.split("→");
-    return { from, to, amount: Math.round(amount * 100) / 100, currency };
-  });
+  const seen = new Set<string>();
+  const result: { from: string; to: string; amount: number; currency: string }[] = [];
+  for (const [key, amount] of directed) {
+    if (seen.has(key)) continue;
+    const [a, b] = key.split("→");
+    const reverse = `${b}→${a}`;
+    seen.add(key);
+    seen.add(reverse);
+    const net = amount - (directed.get(reverse) || 0);
+    if (net > 0.009) result.push({ from: a, to: b, amount: Math.round(net * 100) / 100, currency });
+    else if (net < -0.009) result.push({ from: b, to: a, amount: Math.round(-net * 100) / 100, currency });
+  }
+  return result;
 }
 
 /** Greedy min-cash-flow: fewest transfers to settle all debts. */export function simplifyDebts(balances: Balance[], currency: string): { from: string; to: string; amount: number; currency: string }[] {
