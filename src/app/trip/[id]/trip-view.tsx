@@ -87,7 +87,11 @@ function BalancesPane({ groupId, display }: { groupId: string; display: DisplayC
     }));
   }, [data, members, recorded, display]);
   if (loading || isLoading || membersLoading || recordedLoading || !balances || !members) return <TabFallback />;
-  return <BalancesPanel balances={balances} members={members} />;
+  const shownExpenses =
+    display.code === display.baseCurrency
+      ? data?.expenses
+      : data?.expenses.map((e) => ({ ...e, baseAmount: e.amount, baseCurrency: display.code }));
+  return <BalancesPanel balances={balances} members={members} expenses={shownExpenses} />;
 }
 
 function SettlePane({ groupId, display, simplify }: { groupId: string; display: DisplayCtx; simplify: boolean }) {
