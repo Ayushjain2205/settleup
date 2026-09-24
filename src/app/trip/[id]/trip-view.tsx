@@ -11,7 +11,7 @@ import { ExpensesList } from "@/components/expenses-list";
 import { BalancesPanel } from "@/components/balances-panel";
 import { SettleTab } from "@/components/settle-tab";
 import { useExpenses, useMembers, useRecorded } from "@/lib/queries";
-import { applyRecorded, computeBalances, simplifyDebts } from "@/lib/settlements";
+import { applyRecorded, computeBalances, pairwiseDebts, simplifyDebts } from "@/lib/settlements";
 
 type Tab = "expenses" | "balances" | "settle";
 
@@ -111,16 +111,17 @@ function SettlePane({ groupId, display, simplify }: { groupId: string; display: 
     if (simplify) {
       plan = simplifyDebts(settled, display.baseCurrency);
     } else {
-      // Unsimplified: raw pairs minus what's already recorded per pair
-      // (overpayment flips direction instead of vanishing).
+      // Unsimplified à la Splitwise: net balance per pair across the
+      // whole group (no cross-pair netting), minus recorded per pair.
+      const gross = pairwiseDebts(
+        data.expenses.map((e) => ({
+          paidBy: e.paidBy,
+          splits: (data.splitDetails[e.id] || []).map((x) => ({ memberId: x.memberId, amountOwed: x.amount })),
+        })),
+        display.baseCurrency
+      );
       const pairTotals = new Map<string, number>();
-      for (const e of data.expenses) {
-        for (const x of data.splitDetails[e.id] || []) {
-          if (x.memberId === e.paidBy || x.amount < 0.01) continue;
-          const key = `${x.memberId}→${e.paidBy}`;
-          pairTotals.set(key, (pairTotals.get(key) || 0) + x.amount);
-        }
-      }
+      for (const g of gross) pairTotals.set(`${g.from}→${g.to}`, g.amount);
       for (const r of baseRecorded) {
         const key = `${r.from}→${r.to}`;
         const rest = (pairTotals.get(key) || 0) - r.amount;
