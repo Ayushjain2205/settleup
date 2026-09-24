@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useActivityFeed } from "@/lib/queries";
 import { categoryIcon, categoryStyle, timeFull } from "@/lib/feed";
+import { avatarColor } from "@/lib/avatar";
 import { BottomNav } from "@/components/bottom-nav";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 
@@ -57,7 +58,7 @@ export default function ActivityPage() {
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${categoryStyle(item.icon)}`}>
                       <Icon className="w-5 h-5" strokeWidth={1.5} />
                     </div>
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[var(--foreground)] border-2 border-white flex items-center justify-center text-[7px] font-bold text-white">
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[7px] font-bold" style={{ backgroundColor: avatarColor(item.trip).bg, color: avatarColor(item.trip).fg }}>
                       {item.actorAvatar}
                     </div>
                   </div>

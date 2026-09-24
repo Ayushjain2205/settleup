@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { errorMessage } from "@/lib/error";
+import { avatarColor, avatarInitial } from "@/lib/avatar";
 import { success } from "@/lib/haptics";
 import { toast } from "@/components/toast";
 import { useMemberRows, useSession, useTripMeta } from "@/lib/queries";
@@ -257,7 +258,12 @@ export function SettingsForm({ groupId }: { groupId: string }) {
           <div className="divide-y divide-[var(--border-color)]">
             {allMembers.map((member) => (
               <div key={member.id} className="flex items-center gap-3 py-2.5">
-                <div className="w-8 h-8 rounded-full bg-[var(--foreground)] flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">{member.avatar}</div>
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                  style={{ backgroundColor: avatarColor(member.id).bg, color: avatarColor(member.id).fg }}
+                >
+                  {avatarInitial(member.name)}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-[var(--foreground)] truncate">
                     {member.name}{member.userId === session?.user.id && <span className="ml-1 text-[10px] text-[var(--muted)]">(You)</span>}

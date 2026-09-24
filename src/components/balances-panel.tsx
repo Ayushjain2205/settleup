@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Balance, Expense, Member } from "@/lib/mock-data";
+import { avatarColor, avatarInitial } from "@/lib/avatar";
 
 const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
 
@@ -166,8 +167,11 @@ export function BalancesPanel({ balances, members }: BalancesPanelProps) {
 
           return (
             <div key={balance.memberId} className="list-item bg-white">
-              <div className="w-9 h-9 rounded-full bg-[var(--foreground)] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                {member.avatar}
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                style={{ backgroundColor: avatarColor(member.id).bg, color: avatarColor(member.id).fg }}
+              >
+                {avatarInitial(member.name)}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-[var(--foreground)]">{member.name}</div>
