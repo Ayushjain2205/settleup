@@ -43,6 +43,17 @@ export function ExpensesList({ expenses, members, splitDetails, groupId, display
   }, {} as Record<string, Expense[]>);
 
   const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+  // Stable within-day order: newest added first (createdAt desc), fallback to title/id.
+  for (const date of Object.keys(groupedByDate)) {
+    groupedByDate[date].sort((a, b) => {
+      const ca = a.createdAt || "";
+      const cb = b.createdAt || "";
+      if (ca && cb && ca !== cb) return cb.localeCompare(ca);
+      if (ca && !cb) return -1;
+      if (!ca && cb) return 1;
+      return b.id.localeCompare(a.id);
+    });
+  }
   const getMemberName = (id: string) => members.find((m) => m.id === id)?.name || id;
   const payerLabel = (expense: Expense) => {
     const legs = expense.payers && expense.payers.length > 0 ? expense.payers : [{ memberId: expense.paidBy, amount: expense.baseAmount }];

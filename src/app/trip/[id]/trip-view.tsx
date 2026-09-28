@@ -56,7 +56,13 @@ function ExpensesPane({ groupId, display }: { groupId: string; display: DisplayC
     if (display.code === display.baseCurrency) return data;
     return {
       ...data,
-      expenses: data.expenses.map((e) => ({ ...e, baseAmount: e.amount, baseCurrency: display.code })),
+      expenses: data.expenses.map((e) => ({
+        ...e,
+        // Entered in display currency → show entered amount.
+        // Entered in base (e.g. INR cab) → convert base → spend, don't echo rupees as RM.
+        baseAmount: e.currency === display.code ? e.amount : round2(e.baseAmount / (display.fxRate || 1)),
+        baseCurrency: display.code,
+      })),
     };
   }, [data, display]);
   if (loading || isLoading || !shown || !members) return <TabFallback />;
@@ -101,7 +107,11 @@ function SpendingPane({ groupId, display }: { groupId: string; display: DisplayC
   const shown = useMemo(() => {
     if (!data) return null;
     if (display.code === display.baseCurrency) return data.expenses;
-    return data.expenses.map((e) => ({ ...e, baseAmount: e.amount, baseCurrency: display.code }));
+    return data.expenses.map((e) => ({
+      ...e,
+      baseAmount: e.currency === display.code ? e.amount : round2(e.baseAmount / (display.fxRate || 1)),
+      baseCurrency: display.code,
+    }));
   }, [data, display]);
   if (loading || isLoading || membersLoading || !shown || !members) return <TabFallback />;
   return <Spending expenses={shown} members={members} currency={display.code} baseCurrency={display.baseCurrency} fxRate={display.fxRate} splitDetails={data?.splitDetails || {}} />;

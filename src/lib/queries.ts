@@ -222,9 +222,10 @@ export function useExpenses(groupId: string, baseCurrency: string, sessionReady:
       const [{ data: expenseRows, error: e1 }, { data: splitRows, error: e2 }, { data: payerRows, error: e3 }] = await Promise.all([
         supabase
           .from("expenses")
-          .select("id, title, amount, currency, base_amount, category_id, paid_by, split_mode, expense_date")
+          .select("id, title, amount, currency, base_amount, category_id, paid_by, split_mode, expense_date, created_at")
           .eq("group_id", groupId)
-          .order("expense_date", { ascending: false }),
+          .order("expense_date", { ascending: false })
+          .order("created_at", { ascending: false }),
         supabase
           .from("expense_splits")
           .select("expense_id, member_id, amount_owed, expenses!inner(group_id)")
@@ -255,6 +256,7 @@ export function useExpenses(groupId: string, baseCurrency: string, sessionReady:
         splitAmong: (splitRows || []).filter((s) => s.expense_id === e.id).map((s) => s.member_id),
         splitType: e.split_mode === "percent" ? "exact" : (e.split_mode as Expense["splitType"]),
         date: e.expense_date,
+        createdAt: e.created_at,
         category: broadOf(e.category_id),
         categoryId: e.category_id,
       }));

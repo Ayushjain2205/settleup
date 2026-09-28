@@ -18,6 +18,8 @@ export interface Expense {
   splitAmong: string[];
   splitType: "equal" | "exact" | "itemized";
   date: string;
+  /** ISO timestamp for stable within-day ordering (newest added first). */
+  createdAt?: string;
   category: "food" | "transport" | "activity" | "accommodation" | "other";
   /** Detailed category id (e.g. dining_out); falls back to broad category. */
   categoryId?: string;
