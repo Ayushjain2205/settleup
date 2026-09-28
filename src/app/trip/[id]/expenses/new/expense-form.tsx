@@ -59,6 +59,8 @@ export function ExpenseForm() {
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [paidBy, setPaidBy] = useState("");
+  const [isMultiPayer, setIsMultiPayer] = useState(false);
+  const [payerAmounts, setPayerAmounts] = useState<Record<string, string>>({});
   const [splitMode, setSplitMode] = useState<SplitMode>("equal");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [exactAmounts, setExactAmounts] = useState<Record<string, string>>({});
@@ -121,9 +123,25 @@ export function ExpenseForm() {
         }
       });
     }
+    // Payers hydrate in entered currency; multi when 2+ legs
+    const payersEntered: Record<string, string> = {};
+    if (detail.payers && detail.payers.length > 0) {
+      let runningPaid = 0;
+      detail.payers.forEach((p, i) => {
+        const v = round2(toEntered(p.paid));
+        if (i < detail.payers.length - 1) {
+          payersEntered[p.memberId] = String(v);
+          runningPaid += v;
+        } else {
+          payersEntered[p.memberId] = String(round2(amountNum - runningPaid));
+        }
+      });
+    }
     setTitle(detail.title);
     setAmount(String(amountNum));
     setPaidBy(detail.paidBy);
+    setIsMultiPayer((detail.payers?.length || 0) > 1);
+    setPayerAmounts(payersEntered);
     setSplitMode(detail.splitMode === "itemized" ? "exact" : (detail.splitMode as SplitMode));
     setSelectedMembers(detail.splits.map((s) => s.memberId));
     setExactAmounts(exact);
@@ -157,18 +175,30 @@ export function ExpenseForm() {
   const isToday = expenseDate === new Date().toISOString().split("T")[0];
   const dateLabel = isToday ? "Today" : new Date(expenseDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-  const paidByName = members.find((m) => m.id === paidBy)?.name || "you";
+  const paidByName = (() => {
+    if (!isMultiPayer) return members.find((m) => m.id === paidBy)?.name || "you";
+    const ids = Object.keys(payerAmounts).filter((id) => (parseFloat(payerAmounts[id]) || 0) > 0);
+    if (ids.length === 0) return "Multiple people";
+    if (ids.length === 1) return members.find((m) => m.id === ids[0])?.name || "1 person";
+    const first = members.find((m) => m.id === ids[0])?.name || "Someone";
+    return `${first} +${ids.length - 1}`;
+  })();
   const splitLabel = splitMode === "equal" ? "equally" : splitMode === "exact" ? "by amount" : splitMode === "percent" ? "by %" : "by items";
 
   // Per-mode balance validation
   const totalExact = Object.values(exactAmounts).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   const totalPercent = Object.values(percentages).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   const totalItemized = items.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+  const totalPaidBy = Object.values(payerAmounts).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+  const payersValid = isMultiPayer
+    ? Object.keys(payerAmounts).filter((id) => (parseFloat(payerAmounts[id]) || 0) > 0).length > 0 &&
+      Math.abs(totalPaidBy - amountNum) < 0.01
+    : paidBy !== "";
 
   const canSubmit =
     amountNum > 0 &&
     title.trim().length > 0 &&
-    paidBy !== "" &&
+    payersValid &&
     (splitMode === "equal"
       ? selectedMembers.length > 0
       : splitMode === "exact"
@@ -205,13 +235,21 @@ export function ExpenseForm() {
         return;
       }
 
+      const payerIds = isMultiPayer
+        ? Object.keys(payerAmounts).filter((id) => (parseFloat(payerAmounts[id]) || 0) > 0)
+        : [paidBy];
+      const firstPayer = payerIds[0] || paidBy;
       await saveExpense.mutateAsync({
         title: title.trim(),
         amount: amountNum,
         currency,
         baseAmount,
         categoryId: category?.id || "other",
-        paidBy,
+        paidBy: firstPayer,
+        payers: payerIds.map((id) => ({
+          memberId: id,
+          amountPaid: toBase(parseFloat(isMultiPayer ? payerAmounts[id] : String(amountNum)) || 0),
+        })),
         splitMode,
         expenseDate,
         splits: computeSplits(),
@@ -231,6 +269,14 @@ export function ExpenseForm() {
 
   const handlePayerSelect = (id: string) => {
     setPaidBy(id);
+    setIsMultiPayer(false);
+  };
+
+  const handleMultiPayerSelect = (payers: Record<string, string>) => {
+    setPayerAmounts(payers);
+    const ids = Object.keys(payers);
+    if (ids.length > 0) setPaidBy(ids[0]);
+    setIsMultiPayer(ids.length > 1);
   };
 
   const handleScanPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -426,7 +472,7 @@ export function ExpenseForm() {
         </div>
 
         {/* Paid by + Split */}
-        <div className="flex items-center justify-center gap-2 text-[15px]">
+        <div className="flex items-center justify-center gap-2 text-[15px] flex-wrap">
           <span className="text-[var(--muted)]">Paid by</span>
           <button
             onClick={() => setShowPayerPicker(true)}
@@ -442,6 +488,13 @@ export function ExpenseForm() {
             {splitLabel}
           </button>
         </div>
+        {isMultiPayer && amountNum > 0 && (
+          <p className={`text-center text-[11px] mt-2 font-medium ${Math.abs(totalPaidBy - amountNum) < 0.01 ? "text-[var(--success)]" : "text-[var(--error)]"}`}>
+            {Math.abs(totalPaidBy - amountNum) < 0.01
+              ? `Paid by ${Object.keys(payerAmounts).filter((id) => (parseFloat(payerAmounts[id]) || 0) > 0).length} people · ${symbol}${totalPaidBy.toLocaleString()}`
+              : `Payers cover ${symbol}${totalPaidBy.toLocaleString()} of ${symbol}${amountNum.toLocaleString()} — tap "${paidByName}" to fix`}
+          </p>
+        )}
 
         {error && (
           <div className="flex items-center justify-between gap-3 bg-[var(--error)]/5 border border-[var(--error)]/20 rounded-xl px-4 py-2.5 mt-4">
@@ -523,6 +576,10 @@ export function ExpenseForm() {
           selected={paidBy}
           onSelect={handlePayerSelect}
           onClose={() => setShowPayerPicker(false)}
+          amount={amountNum}
+          symbol={symbol}
+          initialPayers={isMultiPayer ? payerAmounts : paidBy ? { [paidBy]: amount } : {}}
+          onSelectMulti={handleMultiPayerSelect}
         />
       )}
       {showSplitOptions && (

@@ -10,6 +10,8 @@ export interface SaveExpenseArgs {
   baseAmount: number;
   categoryId: string;
   paidBy: string;
+  /** Multi-payer breakdown in base currency. When 2+ entries, paidBy is the first for legacy readers. */
+  payers?: { memberId: string; amountPaid: number }[];
   splitMode: string;
   expenseDate: string;
   splits: { memberId: string; amountOwed: number }[];
@@ -20,6 +22,10 @@ export function useSaveExpense(groupId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: SaveExpenseArgs) => {
+      const payers =
+        args.payers && args.payers.length > 0
+          ? args.payers.map((p) => ({ memberId: p.memberId, amountPaid: Math.round(p.amountPaid * 100) / 100 }))
+          : [{ memberId: args.paidBy, amountPaid: Math.round(args.baseAmount * 100) / 100 }];
       const { error } = await supabase.rpc("save_expense", {
         p_group_id: groupId,
         p_title: args.title,
@@ -32,6 +38,7 @@ export function useSaveExpense(groupId: string) {
         p_expense_date: args.expenseDate,
         p_splits: args.splits,
         p_expense_id: args.expenseId || null,
+        p_payers: payers,
       });
       if (error) throw error;
     },

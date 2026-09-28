@@ -29,7 +29,12 @@ export function ExpenseDetail({ groupId, expense, members, splits, displayCurren
   const [error, setError] = useState<string | null>(null);
 
   const getMember = (id: string) => members.find((m) => m.id === id);
+  const payerLegs =
+    expense.payers && expense.payers.length > 0
+      ? expense.payers
+      : [{ memberId: expense.paidBy, amount: expense.baseAmount }];
   const payer = getMember(expense.paidBy);
+  const multiPayer = payerLegs.length > 1;
 
   const handleDelete = () => {
     if (!window.confirm(`Delete "${expense.title}"? This can't be undone.`)) return;
@@ -76,9 +81,38 @@ export function ExpenseDetail({ groupId, expense, members, splits, displayCurren
             </div>
             <div className="text-[11px] text-[var(--muted)] mt-1">
               {new Date(expense.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-              {" · "}Paid by {payer?.name || "someone"}
+              {" · "}
+              {multiPayer
+                ? `Paid by ${payerLegs.map((p) => getMember(p.memberId)?.name || "someone").join(", ")}`
+                : `Paid by ${payer?.name || "someone"}`}
             </div>
           </div>
+
+          {multiPayer && (
+            <>
+              <div className="px-4 py-2">
+                <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Paid by</span>
+              </div>
+              <div className="divide-y divide-[var(--border-color)] border-b border-[var(--border-color)]">
+                {payerLegs.map((p) => {
+                  const m = getMember(p.memberId);
+                  if (!m) return null;
+                  const shownPaid = displayCurrency === baseCurrency ? p.amount : round2(p.amount / (fxRate || 1));
+                  return (
+                    <div key={p.memberId} className="flex items-center gap-3 px-4 py-2.5">
+                      <div className="w-8 h-8 rounded-full bg-[var(--success)]/10 flex items-center justify-center text-[10px] font-bold text-[var(--success)] flex-shrink-0">
+                        {m.avatar}
+                      </div>
+                      <span className="flex-1 text-sm font-medium text-[var(--foreground)]">{m.name}</span>
+                      <span className="text-sm font-semibold text-[var(--foreground)] tabular-nums">
+                        {symbol(displayCurrency)}{shownPaid.toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           <div className="px-4 py-2">
             <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">Split</span>

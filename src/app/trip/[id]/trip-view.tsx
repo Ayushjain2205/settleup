@@ -71,7 +71,11 @@ function BalancesPane({ groupId, display }: { groupId: string; display: DisplayC
   const balances = useMemo(() => {
     if (!data || !members || !recorded) return null;
     const memberIds = members.map((m) => m.id);
-    const paid = data.expenses.map((e) => ({ paidBy: e.paidBy, baseAmount: e.baseAmount }));
+    const paid = data.expenses.flatMap((e) =>
+      e.payers && e.payers.length > 0
+        ? e.payers.map((p) => ({ paidBy: p.memberId, baseAmount: p.amount }))
+        : [{ paidBy: e.paidBy, baseAmount: e.baseAmount }]
+    );
     const splits = Object.values(data.splitDetails).flat().map((x) => ({ memberId: x.memberId, amountOwed: x.amount }));
     const raw = computeBalances(memberIds, paid, splits, display.baseCurrency);
     const toBase = (amount: number, currency: string) =>
@@ -111,7 +115,11 @@ function SettlePane({ groupId, display, simplify }: { groupId: string; display: 
   const { settlements, shownRecorded } = useMemo(() => {
     if (!data || !members || !recorded) return { balances: null, settlements: null, shownRecorded: null };
     const memberIds = members.map((m) => m.id);
-    const paid = data.expenses.map((e) => ({ paidBy: e.paidBy, baseAmount: e.baseAmount }));
+    const paid = data.expenses.flatMap((e) =>
+      e.payers && e.payers.length > 0
+        ? e.payers.map((p) => ({ paidBy: p.memberId, baseAmount: p.amount }))
+        : [{ paidBy: e.paidBy, baseAmount: e.baseAmount }]
+    );
     const splits = Object.values(data.splitDetails).flat().map((x) => ({ memberId: x.memberId, amountOwed: x.amount }));
     const b = computeBalances(memberIds, paid, splits, display.baseCurrency);
     // Recorded payments settle in their own currency — normalize to base
@@ -129,6 +137,10 @@ function SettlePane({ groupId, display, simplify }: { groupId: string; display: 
       const gross = pairwiseDebts(
         data.expenses.map((e) => ({
           paidBy: e.paidBy,
+          payers:
+            e.payers && e.payers.length > 0
+              ? e.payers.map((p) => ({ memberId: p.memberId, amount: p.amount }))
+              : undefined,
           splits: (data.splitDetails[e.id] || []).map((x) => ({ memberId: x.memberId, amountOwed: x.amount })),
         })),
         display.baseCurrency

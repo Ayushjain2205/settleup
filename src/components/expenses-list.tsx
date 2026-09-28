@@ -44,6 +44,11 @@ export function ExpensesList({ expenses, members, splitDetails, groupId, display
 
   const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
   const getMemberName = (id: string) => members.find((m) => m.id === id)?.name || id;
+  const payerLabel = (expense: Expense) => {
+    const legs = expense.payers && expense.payers.length > 0 ? expense.payers : [{ memberId: expense.paidBy, amount: expense.baseAmount }];
+    if (legs.length <= 1) return getMemberName(legs[0]?.memberId || expense.paidBy);
+    return `${getMemberName(legs[0].memberId)} +${legs.length - 1}`;
+  };
   const [openId, setOpenId] = useState<string | null>(null);
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -125,7 +130,7 @@ export function ExpensesList({ expenses, members, splitDetails, groupId, display
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-[var(--foreground)] truncate">{expense.title}</div>
                       <div className="text-[11px] text-[var(--muted)]">
-                        {getMemberName(expense.paidBy)} · {expense.splitAmong.length} ways
+                        {payerLabel(expense)} · {expense.splitAmong.length} ways
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">

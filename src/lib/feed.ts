@@ -43,6 +43,12 @@ interface FeedSplit {
   amount_owed: string | number;
 }
 
+interface FeedPayer {
+  expense_id: string;
+  member_id: string;
+  amount_paid: string | number;
+}
+
 const symbol = (c: string) => (c === "INR" ? "₹" : c === "MYR" ? "RM" : "$");
 
 export function timeFull(iso: string): string {
@@ -75,7 +81,8 @@ export function buildFeed(
   expenses: FeedExpense[],
   settlements: FeedSettlement[],
   splits: FeedSplit[],
-  currentUserId: string | undefined
+  currentUserId: string | undefined,
+  payers: FeedPayer[] = []
 ): EnrichedFeedItem[] {
   const groupById = new Map(groups.map((g) => [g.id, g]));
   const memberById = new Map(members.map((m) => [m.id, m]));
@@ -103,22 +110,31 @@ export function buildFeed(
     const g = groupById.get(e.group_id);
     if (!g) continue;
     const total = Number(e.base_amount);
-    const myShare = shareOf(e.id, myMemberByGroup.get(e.group_id));
-    const iPaid = myMemberByGroup.get(e.group_id) === e.paid_by;
-    // What matters on a bill: others' debt to me if I paid,
-    // my debt if someone else did. Self-only bills show nothing.
+    const myMemberId = myMemberByGroup.get(e.group_id);
+    const myShare = shareOf(e.id, myMemberId);
+    const legs = payers.filter((p) => p.expense_id === e.id);
+    const myPaid =
+      legs.length > 0
+        ? legs.filter((p) => p.member_id === myMemberId).reduce((s, p) => s + Number(p.amount_paid), 0)
+        : myMemberId && myMemberId === e.paid_by
+          ? total
+          : 0;
+    // Net on this bill: what I fronted minus my share.
     let impact: EnrichedFeedItem["impact"] = null;
-    if (iPaid) {
-      const othersOwe = total - myShare;
-      if (othersOwe > 0.009) impact = { text: `You are owed ${fmt(g.baseCurrency, othersOwe)}`, tone: "good" };
-    } else if (myShare > 0.009) {
-      impact = { text: `You owe ${fmt(g.baseCurrency, myShare)}`, tone: "bad" };
-    }
+    const net = myPaid - myShare;
+    if (net > 0.009) impact = { text: `You are owed ${fmt(g.baseCurrency, net)}`, tone: "good" };
+    else if (net < -0.009) impact = { text: `You owe ${fmt(g.baseCurrency, -net)}`, tone: "bad" };
+    const payerIds = legs.length > 0 ? legs.map((p) => p.member_id) : [e.paid_by];
+    const multi = payerIds.length > 1;
+    const subject = multi
+      ? `${nameOf(payerIds[0])} +${payerIds.length - 1}`
+      : nameOf(e.paid_by);
+    const initial = multi ? "+" : avatarOf(e.paid_by);
     feed.push({
       key: `e-${e.id}`,
       at: e.created_at,
-      subject: nameOf(e.paid_by),
-      initial: avatarOf(e.paid_by),
+      subject,
+      initial,
       action: "added",
       detail: `“${e.title}” in “${g.name}”`,
       amount: null,

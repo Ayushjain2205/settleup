@@ -84,8 +84,9 @@ export function useGroups() {
       const ids = (groups || []).map((g) => g.id);
       let splitRows: { expense_id: string; member_id: string; amount_owed: string | number }[] = [];
       let recordedRows: { group_id: string; from_member: string; to_member: string; amount: string | number; currency: string }[] = [];
+      let payerRows: { expense_id: string; member_id: string; amount_paid: string | number; expenses: { group_id: string } | { group_id: string }[] }[] = [];
       if (ids.length > 0) {
-        const [{ data: splits, error: splitError }, { data: settled, error: settledError }] = await Promise.all([
+        const [{ data: splits, error: splitError }, { data: settled, error: settledError }, { data: payers, error: payerError }] = await Promise.all([
           supabase
             .from("expense_splits")
             .select("expense_id, member_id, amount_owed, expenses!inner(group_id)")
@@ -95,11 +96,17 @@ export function useGroups() {
             .select("group_id, from_member, to_member, amount, currency")
             .in("group_id", ids)
             .eq("status", "confirmed"),
+          supabase
+            .from("expense_payers")
+            .select("expense_id, member_id, amount_paid, expenses!inner(group_id)")
+            .in("expenses.group_id", ids),
         ]);
         if (splitError) throw splitError;
         if (settledError) throw settledError;
+        if (payerError) throw payerError;
         splitRows = splits || [];
         recordedRows = settled || [];
+        payerRows = (payers as typeof payerRows) || [];
       }
       const splitsByExpense = new Map<string, { memberId: string; amountOwed: number }[]>();
       for (const s of splitRows) {
@@ -107,16 +114,39 @@ export function useGroups() {
         arr.push({ memberId: s.member_id, amountOwed: Number(s.amount_owed) });
         splitsByExpense.set(s.expense_id, arr);
       }
+      const payersByExpense = new Map<string, { memberId: string; amount: number }[]>();
+      for (const p of payerRows) {
+        const arr = payersByExpense.get(p.expense_id) || [];
+        arr.push({ memberId: p.member_id, amount: Number(p.amount_paid) });
+        payersByExpense.set(p.expense_id, arr);
+      }
+      const expenseGroup = new Map<string, string>();
+      for (const g of groups || []) {
+        for (const e of (g as { expenses?: { id?: string }[] }).expenses || []) {
+          if (e.id) expenseGroup.set(e.id, g.id);
+        }
+      }
+      // Fallback when the join shape doesn't return group_id (older rows):
+      // attribute orphan payer rows via expenseGroup map.
+      if (payerRows.length > 0 && payersByExpense.size > 0) {
+        // already grouped by expense; group attribution happens per-expense below
+      }
       return mapGroupRows(groups || []).map((g, i) => {
         const raw = (groups || [])[i];
         const expenses = raw.expenses || [];
+        // Flatten multi-payer legs; fall back to legacy paid_by when no payer rows.
+        const paidLegs = expenses.flatMap((e) => {
+          const legs = e.id ? payersByExpense.get(e.id) : undefined;
+          if (legs && legs.length > 0) return legs.map((l) => ({ paidBy: l.memberId, baseAmount: l.amount }));
+          return [{ paidBy: e.paid_by, baseAmount: Number(e.base_amount) }];
+        });
         return {
           ...g,
           position: computePosition(
             {
               members: (raw.group_members || []).map((m) => ({ id: m.id, userId: m.user_id, name: m.name })),
-              expenses: expenses.map((e) => ({ paidBy: e.paid_by, baseAmount: Number(e.base_amount) })),
-              splits: expenses.flatMap((e) => splitsByExpense.get(e.id) || []),
+              expenses: paidLegs,
+              splits: expenses.flatMap((e) => splitsByExpense.get(e.id!) || []),
               recorded: (recordedRows || [])
                 .filter((r) => r.group_id === g.id)
                 .map((r) => ({ from: r.from_member, to: r.to_member, amount: Number(r.amount), currency: r.currency })),
@@ -189,7 +219,7 @@ export function useExpenses(groupId: string, baseCurrency: string, sessionReady:
   return useQuery({
     queryKey: ["expenses", groupId],
     queryFn: async (): Promise<ExpenseWithSplits> => {
-      const [{ data: expenseRows, error: e1 }, { data: splitRows, error: e2 }] = await Promise.all([
+      const [{ data: expenseRows, error: e1 }, { data: splitRows, error: e2 }, { data: payerRows, error: e3 }] = await Promise.all([
         supabase
           .from("expenses")
           .select("id, title, amount, currency, base_amount, category_id, paid_by, split_mode, expense_date")
@@ -199,9 +229,20 @@ export function useExpenses(groupId: string, baseCurrency: string, sessionReady:
           .from("expense_splits")
           .select("expense_id, member_id, amount_owed, expenses!inner(group_id)")
           .eq("expenses.group_id", groupId),
+        supabase
+          .from("expense_payers")
+          .select("expense_id, member_id, amount_paid, expenses!inner(group_id)")
+          .eq("expenses.group_id", groupId),
       ]);
       if (e1) throw e1;
       if (e2) throw e2;
+      if (e3) throw e3;
+      const payersByExpense = new Map<string, { memberId: string; amount: number }[]>();
+      for (const p of payerRows || []) {
+        const arr = payersByExpense.get(p.expense_id) || [];
+        arr.push({ memberId: p.member_id, amount: Number(p.amount_paid) });
+        payersByExpense.set(p.expense_id, arr);
+      }
       const expenses: Expense[] = (expenseRows || []).map((e) => ({
         id: e.id,
         title: e.title,
@@ -210,6 +251,7 @@ export function useExpenses(groupId: string, baseCurrency: string, sessionReady:
         baseAmount: Number(e.base_amount),
         baseCurrency,
         paidBy: e.paid_by,
+        payers: payersByExpense.get(e.id) || [{ memberId: e.paid_by, amount: Number(e.base_amount) }],
         splitAmong: (splitRows || []).filter((s) => s.expense_id === e.id).map((s) => s.member_id),
         splitType: e.split_mode === "percent" ? "exact" : (e.split_mode as Expense["splitType"]),
         date: e.expense_date,
@@ -268,11 +310,16 @@ export function useActivityFeed() {
         ]);
         const expenseIds = (expenses || []).map((e) => e.id);
         let splits: { expense_id: string; member_id: string; amount_owed: string | number }[] = [];
+        let payers: { expense_id: string; member_id: string; amount_paid: string | number }[] = [];
         if (expenseIds.length > 0) {
-          const { data } = await supabase.from("expense_splits").select("expense_id, member_id, amount_owed").in("expense_id", expenseIds);
-          splits = data || [];
+          const [{ data: s }, { data: p }] = await Promise.all([
+            supabase.from("expense_splits").select("expense_id, member_id, amount_owed").in("expense_id", expenseIds),
+            supabase.from("expense_payers").select("expense_id, member_id, amount_paid").in("expense_id", expenseIds),
+          ]);
+          splits = s || [];
+          payers = p || [];
         }
-        return buildFeed(groupList, members || [], expenses || [], settlements || [], splits, userId);
+        return buildFeed(groupList, members || [], expenses || [], settlements || [], splits, userId, payers);
       },
       enabled: !sessionLoading && !!session && groupIds.length > 0,
     }),
@@ -330,6 +377,7 @@ export interface ExpenseDetailData {
   amount: number;
   currency: string;
   paidBy: string;
+  payers: { memberId: string; paid: number }[];
   splitMode: string;
   categoryId: string;
   expenseDate: string;
@@ -340,17 +388,20 @@ export function useExpenseDetail(groupId: string, expenseId: string, sessionRead
   return useQuery({
     queryKey: ["expense", groupId, expenseId],
     queryFn: async (): Promise<ExpenseDetailData | null> => {
-      const [{ data: expense }, { data: splits }] = await Promise.all([
+      const [{ data: expense }, { data: splits }, { data: payers }] = await Promise.all([
         supabase.from("expenses").select("*").eq("id", expenseId).eq("group_id", groupId).single(),
         supabase.from("expense_splits").select("member_id, amount_owed").eq("expense_id", expenseId),
+        supabase.from("expense_payers").select("member_id, amount_paid").eq("expense_id", expenseId),
       ]);
       if (!expense) return null;
+      const payerList = (payers || []).map((p) => ({ memberId: p.member_id, paid: Number(p.amount_paid) }));
       return {
         id: expense.id,
         title: expense.title,
         amount: Number(expense.amount),
         currency: expense.currency,
         paidBy: expense.paid_by,
+        payers: payerList.length > 0 ? payerList : [{ memberId: expense.paid_by, paid: Number(expense.base_amount) }],
         splitMode: expense.split_mode,
         categoryId: expense.category_id,
         expenseDate: expense.expense_date,

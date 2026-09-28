@@ -135,4 +135,53 @@ describe("pairwiseDebts", () => {
       pairwiseDebts([{ paidBy: "a", splits: [{ memberId: "a", amountOwed: 50 }] }], "INR")
     ).toEqual([]);
   });
+
+  it("splits each ower across multiple payers proportionally", () => {
+    // Total 100: a paid 60, b paid 40. c owes 50, a owes 30, b owes 20.
+    // c→a 30, c→b 20; a→b 12 (30*40/100, self 18 skipped); b→a 12 (20*60/100)
+    // Net: c→a 30, c→b 20, a→b 12 vs b→a 12 cancel → c→a 30, c→b 20
+    const result = pairwiseDebts(
+      [
+        {
+          payers: [
+            { memberId: "a", amount: 60 },
+            { memberId: "b", amount: 40 },
+          ],
+          splits: [
+            { memberId: "a", amountOwed: 30 },
+            { memberId: "b", amountOwed: 20 },
+            { memberId: "c", amountOwed: 50 },
+          ],
+        },
+      ],
+      "INR"
+    );
+    expect(result).toContainEqual({ from: "c", to: "a", amount: 30, currency: "INR" });
+    expect(result).toContainEqual({ from: "c", to: "b", amount: 20, currency: "INR" });
+    // a and b net to zero between themselves (12 each way cancels)
+    expect(result.find((r) => (r.from === "a" && r.to === "b") || (r.from === "b" && r.to === "a"))).toBeUndefined();
+  });
+
+  it("balances agree with flattened multi-payer legs", () => {
+    // a paid 60, b paid 40; a owes 30, b owes 20, c owes 50
+    // → a +30, b +20, c -50
+    const balances = computeBalances(
+      ["a", "b", "c"],
+      [
+        { paidBy: "a", baseAmount: 60 },
+        { paidBy: "b", baseAmount: 40 },
+      ],
+      [
+        { memberId: "a", amountOwed: 30 },
+        { memberId: "b", amountOwed: 20 },
+        { memberId: "c", amountOwed: 50 },
+      ],
+      "INR"
+    );
+    expect(balances).toEqual([
+      { memberId: "a", amount: 30, currency: "INR" },
+      { memberId: "b", amount: 20, currency: "INR" },
+      { memberId: "c", amount: -50, currency: "INR" },
+    ]);
+  });
 });

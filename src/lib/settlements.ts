@@ -50,17 +50,50 @@ export function applyRecorded(
 
 /** Unsimplified view: net balance per pair across the group (no
  *  cross-pair netting). Opposite directions collapse to the delta —
- *  a pair never shows both ways. Self-pairs are skipped. */
+ *  a pair never shows both ways. Self-pairs are skipped.
+ *
+ *  Multi-payer: each ower's share is split across payers proportionally
+ *  to amount paid (Pi / total). Single-payer legacy (`paidBy` only)
+ *  keeps the exact old behavior. */
 export function pairwiseDebts(
-  items: { paidBy: string; splits: { memberId: string; amountOwed: number }[] }[],
+  items: {
+    paidBy?: string;
+    payers?: { memberId: string; amount: number }[];
+    splits: { memberId: string; amountOwed: number }[];
+  }[],
   currency: string
 ): { from: string; to: string; amount: number; currency: string }[] {
   const directed = new Map<string, number>();
   for (const item of items) {
+    const payers =
+      item.payers && item.payers.length > 0
+        ? item.payers
+        : item.paidBy
+          ? [{ memberId: item.paidBy, amount: 0 }]
+          : [];
+    if (payers.length === 0) continue;
+    const multi = !!item.payers && item.payers.length > 0;
+    if (!multi) {
+      // Legacy single-payer path (exact old behavior)
+      for (const s of item.splits) {
+        if (s.memberId === item.paidBy || s.amountOwed < 0.01) continue;
+        const key = `${s.memberId}→${item.paidBy}`;
+        directed.set(key, (directed.get(key) || 0) + s.amountOwed);
+      }
+      continue;
+    }
+    const total = payers.reduce((s, p) => s + (p.amount || 0), 0);
+    if (total <= 0) continue;
     for (const s of item.splits) {
-      if (s.memberId === item.paidBy || s.amountOwed < 0.01) continue;
-      const key = `${s.memberId}→${item.paidBy}`;
-      directed.set(key, (directed.get(key) || 0) + s.amountOwed);
+      if (s.amountOwed < 0.01) continue;
+      for (const p of payers) {
+        if (s.memberId === p.memberId) continue;
+        if ((p.amount || 0) <= 0) continue;
+        const share = (s.amountOwed * p.amount) / total;
+        if (share < 0.005) continue;
+        const key = `${s.memberId}→${p.memberId}`;
+        directed.set(key, (directed.get(key) || 0) + share);
+      }
     }
   }
   const seen = new Set<string>();

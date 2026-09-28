@@ -13,6 +13,8 @@ export interface Expense {
   baseAmount: number;
   baseCurrency: string;
   paidBy: string;
+  /** Multi-payer breakdown in base currency. Absent/empty = legacy single-payer (paidBy paid baseAmount). */
+  payers?: { memberId: string; amount: number }[];
   splitAmong: string[];
   splitType: "equal" | "exact" | "itemized";
   date: string;
