@@ -44,8 +44,10 @@ export function mapScanToLines(scan: ScanResult, memberIds: string[]): FormLine[
   return lines;
 }
 
-/** Downscale an image to a JPEG blob for upload. Runs in the browser. */
-export function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<Blob> {
+/** Downscale an image to a JPEG blob for upload. Runs in the browser.
+ *  Kept small (1280px / q0.72) so the scan request stays well under the
+ *  serverless time limit — still plenty for receipt OCR. */
+export function compressImage(file: File, maxDim = 1280, quality = 0.72): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
