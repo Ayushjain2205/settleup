@@ -75,6 +75,7 @@ export function ExpenseForm() {
   const [category, setCategory] = useState<Category | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanRetrying, setScanRetrying] = useState(false);
   const [scanStage, setScanStage] = useState(0);
   const [hydratedId, setHydratedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -296,17 +297,39 @@ export function ExpenseForm() {
     if (isScanning) return;
     setIsScanning(true);
     setScanStage(0);
+    setScanRetrying(false);
     setError(null);
     lastScan.current = blob;
     scanTimer.current = setInterval(() => {
       setScanStage((s) => (s < SCAN_STAGES.length - 1 ? s + 1 : s));
     }, 2400);
-    try {
+    const attemptScan = async () => {
       const form = new FormData();
       form.append("image", blob, "receipt.jpg");
       const res = await fetch("/api/scan-receipt", { method: "POST", body: form });
-      const scan: ScanResult & { error?: string } = await res.json();
-      if (!res.ok) throw new Error(scan.error || "Could not read receipt");
+      const scan: ScanResult & { error?: string } = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(scan.error || "Could not read receipt") as Error & { status?: number };
+        err.status = res.status;
+        throw err;
+      }
+      return scan;
+    };
+    try {
+      let scan: ScanResult;
+      try {
+        scan = await attemptScan();
+      } catch (err) {
+        // Cold upstream (function/model warmup) usually succeeds on an
+        // immediate retry — do it automatically once instead of flashing "busy".
+        if ((err as { status?: number })?.status === 503) {
+          setScanRetrying(true);
+          setScanStage(1);
+          scan = await attemptScan();
+        } else {
+          throw err;
+        }
+      }
 
       const memberIds = members.map((m) => m.id);
       const lines = mapScanToLines(scan, memberIds);
@@ -325,6 +348,7 @@ export function ExpenseForm() {
       failure();
     } finally {
       if (scanTimer.current) clearInterval(scanTimer.current);
+      setScanRetrying(false);
       setIsScanning(false);
     }
   };
@@ -512,7 +536,7 @@ export function ExpenseForm() {
             <svg className="w-4 h-4 animate-spin text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
-            <span className="text-xs font-medium text-[var(--muted)]">{SCAN_STAGES[scanStage]}</span>
+            <span className="text-xs font-medium text-[var(--muted)]">{scanRetrying ? "Warming up — retrying…" : SCAN_STAGES[scanStage]}</span>
           </div>
         )}
 

@@ -74,16 +74,16 @@ async function scanWithGemini(bytes: string) {
           "x-goog-api-key": process.env.GEMINI_API_KEY!,
         },
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
           contents: [
             {
               parts: [
-                { inline_data: { mime_type: "image/jpeg", data: bytes } },
+                { inlineData: { mimeType: "image/jpeg", data: bytes } },
               ],
             },
           ],
           generationConfig: {
-            response_mime_type: "application/json",
+            responseMimeType: "application/json",
             maxOutputTokens: 1024,
             temperature: 0,
           },
@@ -179,11 +179,13 @@ export async function POST(request: Request) {
   if (hasGemini) {
     attempts++;
     try {
-      return NextResponse.json(await scanWithGemini(bytes));
+      const parsed = await scanWithGemini(bytes);
+      console.log("scan-receipt:gemini-ok", `ms=${Date.now() - started}`);
+      return NextResponse.json(parsed);
     } catch (e) {
       lastError = e;
       const status = (e as { status?: number })?.status;
-      console.error("scan-receipt:gemini-failed", geminiModel(), status ?? (isAbort(e) ? "timeout" : "error"), (e as Error)?.message?.slice(0, 200));
+      console.error("scan-receipt:gemini-failed", geminiModel(), status ?? (isAbort(e) ? "timeout" : "error"), `ms=${Date.now() - started}`, (e as Error)?.message?.slice(0, 200));
       if (status !== undefined && !isRetryable(status)) {
         return NextResponse.json({ error: "Could not read receipt — enter it manually" }, { status: 422 });
       }
@@ -196,11 +198,13 @@ export async function POST(request: Request) {
       if (Date.now() - started > FLEET_BUDGET_MS) break;
       attempts++;
       try {
-        return NextResponse.json(await scanWithOpenRouter(model, bytes));
+        const parsed = await scanWithOpenRouter(model, bytes);
+        console.log("scan-receipt:openrouter-ok", model, `ms=${Date.now() - started}`);
+        return NextResponse.json(parsed);
       } catch (e) {
         lastError = e;
         const status = (e as { status?: number })?.status;
-        console.error("scan-receipt:openrouter-failed", model, status ?? (isAbort(e) ? "timeout" : "error"), (e as Error)?.message?.slice(0, 200));
+        console.error("scan-receipt:openrouter-failed", model, status ?? (isAbort(e) ? "timeout" : "error"), `ms=${Date.now() - started}`, (e as Error)?.message?.slice(0, 200));
         if (status !== undefined && !isRetryable(status)) {
           return NextResponse.json({ error: "Could not read receipt — enter it manually" }, { status: 422 });
         }
