@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useExpenseDetail, useMembers, useSession, useTripMeta } from "@/lib/queries";
+import { useExpenseDetail, useMemberRows, useSession, useTripMeta } from "@/lib/queries";
 import { errorMessage } from "@/lib/error";
 import { success, failure } from "@/lib/haptics";
 import { toast } from "@/components/toast";
@@ -31,6 +31,7 @@ interface MemberInfo {
   id: string;
   name: string;
   avatar: string;
+  userId?: string | null;
 }
 
 export function ExpenseForm() {
@@ -44,10 +45,10 @@ export function ExpenseForm() {
   const { data: session, isLoading: sessionLoading } = useSession();
   const ready = !sessionLoading && !!session;
   const { data: meta, isLoading: metaLoading, error: metaError } = useTripMeta(groupId, ready);
-  const { data: memberRows, isLoading: membersLoading } = useMembers(groupId, ready);
+  const { data: memberRows, isLoading: membersLoading } = useMemberRows(groupId, ready);
   const { data: detail, isLoading: detailLoading } = useExpenseDetail(groupId, expenseId || "", ready && isEdit);
 
-  const members: MemberInfo[] = memberRows || [];
+  const members: MemberInfo[] = (memberRows || []).map((m) => ({ id: m.id, name: m.name, avatar: m.avatar, userId: m.userId }));
   const group: GroupInfo = {
     id: groupId,
     name: meta?.name || "",
@@ -83,12 +84,13 @@ export function ExpenseForm() {
   const lastScan = useRef<Blob | null>(null);
   const saveExpense = useSaveExpense(group.id);
 
-  // Create mode: default payer/selection once members arrive
+  // Create mode: default payer to the logged-in user, selection to everyone
+  const myMemberId = members.find((m) => m.userId && m.userId === session?.user.id)?.id;
   useEffect(() => {
     if (isEdit || members.length === 0) return;
-    if (!paidBy) setPaidBy(members[0].id);
+    if (!paidBy) setPaidBy(myMemberId || members[0].id);
     if (selectedMembers.length === 0) setSelectedMembers(members.map((m) => m.id));
-  }, [members, isEdit, paidBy, selectedMembers.length]);
+  }, [members, isEdit, paidBy, selectedMembers.length, myMemberId]);
 
   // Edit mode: hydrate once from fetched detail (balances pinned to balance)
   useEffect(() => {
