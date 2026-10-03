@@ -81,6 +81,8 @@ export function ExpenseForm() {
   const [scanStage, setScanStage] = useState(0);
   const [hydratedId, setHydratedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const amountRef = useRef<HTMLInputElement>(null);
+  const [amountFocused, setAmountFocused] = useState(false);
   const scanTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastScan = useRef<Blob | null>(null);
   const saveExpense = useSaveExpense(group.id);
@@ -308,6 +310,33 @@ export function ExpenseForm() {
     setIsMultiPayer(ids.length > 1);
   };
 
+  // Operator pad: insert at cursor (numeric keyboards lack operators)
+  const insertOp = (op: string) => {
+    const el = amountRef.current;
+    const start = el?.selectionStart ?? amount.length;
+    const end = el?.selectionEnd ?? amount.length;
+    const next = amount.slice(0, start) + op + amount.slice(end);
+    setAmount(next);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const pos = start + op.length;
+      el?.setSelectionRange(pos, pos);
+    });
+  };
+
+  const deleteOpChar = () => {
+    const el = amountRef.current;
+    const start = el?.selectionStart ?? amount.length;
+    const end = el?.selectionEnd ?? amount.length;
+    const next = start !== end ? amount.slice(0, start) + amount.slice(end) : amount.slice(0, Math.max(0, start - 1)) + amount.slice(end);
+    const pos = start !== end ? start : Math.max(0, start - 1);
+    setAmount(next);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(pos, pos);
+    });
+  };
+
   const handleScanPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -515,12 +544,15 @@ export function ExpenseForm() {
             <span className="text-lg font-semibold text-[var(--muted)]">{symbol}</span>
           </button>
           <input
+            ref={amountRef}
             type="text"
             inputMode="decimal"
             autoComplete="off"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            onFocus={() => setAmountFocused(true)}
             onBlur={() => {
+              setAmountFocused(false);
               // Collapse "850+120" into its result when leaving the field
               const v = evaluateExpression(amount);
               if (v !== null && String(v) !== amount.trim()) setAmount(String(v));
@@ -534,6 +566,30 @@ export function ExpenseForm() {
             </span>
           )}
         </div>
+
+        {/* Operator pad — numeric keyboards have no +−×÷, so provide them */}
+        {amountFocused && (
+          <div className="flex gap-1.5 -mt-3 mb-4">
+            {(["+", "−", "×", "÷", "(", ")"] as const).map((op) => (
+              <button
+                key={op}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => insertOp(op)}
+                className="flex-1 py-1.5 rounded-lg bg-[var(--border-color)]/40 text-base font-bold text-[var(--foreground)] active:bg-[var(--primary)] active:text-white transition-colors"
+              >
+                {op}
+              </button>
+            ))}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={deleteOpChar}
+              aria-label="Delete last character"
+              className="flex-1 py-1.5 rounded-lg bg-[var(--border-color)]/40 text-base font-bold text-[var(--foreground)] active:bg-[var(--primary)] active:text-white transition-colors"
+            >
+              ⌫
+            </button>
+          </div>
+        )}
 
         {/* Paid by + Split */}
         <div className="flex items-center justify-center gap-2 text-[15px] flex-wrap">
