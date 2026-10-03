@@ -7,7 +7,11 @@ export const runtime = "nodejs";
 
 const DEFAULT_MODELS = [
   "google/gemini-3.8-flash",
-  "google/gemini-3.6-flash",
+  // Deliberately cross-provider: same-family models tend to fail together
+  // (shared outage), while GPT/Qwen have independent capacity. Both are
+  // strong at receipt OCR and cheap.
+  "openai/gpt-4.1-mini",
+  "qwen/qwen2.5-vl-72b-instruct",
 ];
 
 function modelFleet(): string[] {
@@ -23,7 +27,7 @@ function geminiModel(): string {
 }
 
 // Total upstream budget: direct Gemini is usually 3-6s, OpenRouter slower.
-const FLEET_BUDGET_MS = 25000;
+const FLEET_BUDGET_MS = 27000;
 const GEMINI_TIMEOUT_MS = 20000;
 const OPENROUTER_TIMEOUT_MS = 15000;
 
@@ -46,6 +50,39 @@ function stripFences(text: string): string {
     return t.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
   }
   return t;
+}
+
+/** Providers disagree on the content shape: plain string, or an array of
+ *  text blocks. Coerce to a single string (never "[object Object]"). */
+function extractText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((b) => (typeof b === "string" ? b : (b as { text?: string })?.text || ""))
+      .join("");
+  }
+  return "";
+}
+
+/** Parse model output tolerantly: direct parse first, then salvage the
+ *  outermost {...} when the model chats around the JSON. Throws with the
+ *  raw snippet attached so logs show what actually came back. */
+function parseModelJson(text: string): unknown {
+  const cleaned = stripFences(text);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        // fall through to diagnostic error below
+      }
+    }
+    throw new Error(`Unparseable model output: ${cleaned.slice(0, 200)}`);
+  }
 }
 
 function shape(parsed: unknown) {
@@ -99,7 +136,7 @@ async function scanWithGemini(bytes: string) {
     const body = await res.json();
     const text: string =
       body?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") || "{}";
-    return shape(JSON.parse(stripFences(text)));
+    return shape(parseModelJson(text));
   } finally {
     clearTimeout(timeout);
   }
@@ -141,8 +178,8 @@ async function scanWithOpenRouter(model: string, bytes: string) {
       throw err;
     }
     const body = await res.json();
-    const text: string = body?.choices?.[0]?.message?.content || "{}";
-    return shape(JSON.parse(stripFences(text)));
+    const text = extractText(body?.choices?.[0]?.message?.content) || "{}";
+    return shape(parseModelJson(text));
   } finally {
     clearTimeout(timeout);
   }
