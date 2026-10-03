@@ -384,16 +384,19 @@ export interface ExpenseDetailData {
   categoryId: string;
   expenseDate: string;
   splits: { memberId: string; owed: number }[];
+  /** Itemized lines in entered currency (empty unless splitMode is itemized). */
+  items: { name: string; amount: string; kind: "item" | "adjustment"; auto: boolean; splitAmong: string[] }[];
 }
 
 export function useExpenseDetail(groupId: string, expenseId: string, sessionReady: boolean) {
   return useQuery({
     queryKey: ["expense", groupId, expenseId],
     queryFn: async (): Promise<ExpenseDetailData | null> => {
-      const [{ data: expense }, { data: splits }, { data: payers }] = await Promise.all([
+      const [{ data: expense }, { data: splits }, { data: payers }, { data: itemRows }] = await Promise.all([
         supabase.from("expenses").select("*").eq("id", expenseId).eq("group_id", groupId).single(),
         supabase.from("expense_splits").select("member_id, amount_owed").eq("expense_id", expenseId),
         supabase.from("expense_payers").select("member_id, amount_paid").eq("expense_id", expenseId),
+        supabase.from("expense_items").select("name, amount, kind, auto, split_among, position").eq("expense_id", expenseId).order("position"),
       ]);
       if (!expense) return null;
       const payerList = (payers || []).map((p) => ({ memberId: p.member_id, paid: Number(p.amount_paid) }));
@@ -408,6 +411,13 @@ export function useExpenseDetail(groupId: string, expenseId: string, sessionRead
         categoryId: expense.category_id,
         expenseDate: expense.expense_date,
         splits: (splits || []).map((s) => ({ memberId: s.member_id, owed: Number(s.amount_owed) })),
+        items: (itemRows || []).map((r) => ({
+          name: r.name || "",
+          amount: String(Number(r.amount)),
+          kind: (r.kind === "adjustment" ? "adjustment" : "item") as "item" | "adjustment",
+          auto: !!r.auto,
+          splitAmong: (r.split_among as string[]) || [],
+        })),
       };
     },
     enabled: sessionReady,

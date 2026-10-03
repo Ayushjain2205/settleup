@@ -94,6 +94,16 @@ export function SplitOptions({
   const totalPercent = Object.values(percentages).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   const percentRemaining = 100 - totalPercent;
 
+  // Itemized balance: items + tax/charges vs the receipt total.
+  const totalItemsOnly = items
+    .filter((i) => (i.kind || "item") === "item")
+    .reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+  const totalAdjustments = items
+    .filter((i) => i.kind === "adjustment")
+    .reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+  const itemizedRemaining = amount - (totalItemsOnly + totalAdjustments);
+  const unnamedCount = items.filter((i) => i.name.trim().length === 0).length;
+
   const handleConfirm = () => {
     onConfirm(mode, selected, exactAmounts, percentages, items);
     onClose();
@@ -435,6 +445,23 @@ export function SplitOptions({
                   {Math.abs(percentRemaining) < 0.01 ? "100%" : `${percentRemaining.toFixed(1)}% left`}
                 </div>
               </>
+            )}
+            {mode === "itemized" && (
+              <div className="flex flex-col gap-0.5">
+                <div className={`text-sm font-semibold ${Math.abs(itemizedRemaining) < 0.01 && unnamedCount === 0 ? "text-[var(--success)]" : "text-[var(--error)]"}`}>
+                  {unnamedCount > 0
+                    ? `${unnamedCount} item${unnamedCount > 1 ? "s" : ""} need${unnamedCount > 1 ? "" : "s"} a name`
+                    : Math.abs(itemizedRemaining) < 0.01
+                      ? "Balanced"
+                      : `${symbol}${Math.abs(itemizedRemaining).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${itemizedRemaining > 0 ? "left" : "over"}`}
+                </div>
+                <div className="text-[11px] text-[var(--muted)] tabular-nums">
+                  Items {symbol}{totalItemsOnly.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  {totalAdjustments !== 0 && (
+                    <> · Tax/charges {symbol}{totalAdjustments.toLocaleString(undefined, { maximumFractionDigits: 2 })}</>
+                  )} of {symbol}{amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </div>
+              </div>
             )}
           </div>
           {mode === "equal" && (

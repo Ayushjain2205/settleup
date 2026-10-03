@@ -94,7 +94,7 @@ export function ExpenseForm() {
 
   // Edit mode: hydrate once from fetched detail (balances pinned to balance)
   useEffect(() => {
-    if (!isEdit || !detail || !meta || hydratedId === detail.id) return;
+    if (!isEdit || !detail || !meta || hydratedId === detail.id || members.length === 0) return;
     const round2 = (v: number) => Math.round(v * 100) / 100;
     const useBase = detail.currency === meta.baseCurrency;
     const toEntered = (base: number) => (useBase ? base : base / (meta.fxRate || 1));
@@ -145,15 +145,30 @@ export function ExpenseForm() {
     setPaidBy(detail.paidBy);
     setIsMultiPayer((detail.payers?.length || 0) > 1);
     setPayerAmounts(payersEntered);
-    setSplitMode(detail.splitMode === "itemized" ? "exact" : (detail.splitMode as SplitMode));
+    setSplitMode(detail.splitMode as SplitMode);
     setSelectedMembers(detail.splits.map((s) => s.memberId));
     setExactAmounts(exact);
     setPercentages(pcts);
+    // Itemized lines were persisted at save time — restore them (dropping
+    // member refs that no longer exist). Pre-existing itemized expenses
+    // saved before this have no lines and start blank.
+    if (detail.splitMode === "itemized") {
+      const validIds = new Set(members.map((m) => m.id));
+      setItems(
+        detail.items.map((it) => ({
+          name: it.name,
+          amount: it.amount,
+          splitAmong: it.splitAmong.filter((id) => validIds.has(id)),
+          kind: it.kind,
+          auto: it.auto,
+        }))
+      );
+    }
     setExpenseDate(detail.expenseDate);
     setUseBaseCurrency(useBase);
     setCategory(detail.categoryId ? CATEGORIES.find((c) => c.id === detail.categoryId) || null : null);
     setHydratedId(detail.id);
-  }, [detail, isEdit, meta, hydratedId]);
+  }, [detail, isEdit, meta, hydratedId, members]);
 
   const SCAN_STAGES = ["Uploading receipt…", "Reading receipt…", "Extracting items…"];
 
@@ -192,6 +207,7 @@ export function ExpenseForm() {
   const totalExact = Object.values(exactAmounts).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   const totalPercent = Object.values(percentages).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   const totalItemized = items.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+  const unnamedItems = items.filter((i) => i.name.trim().length === 0).length;
   const totalPaidBy = Object.values(payerAmounts).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   const payersValid = isMultiPayer
     ? Object.keys(payerAmounts).filter((id) => (parseFloat(payerAmounts[id]) || 0) > 0).length > 0 &&
@@ -256,6 +272,13 @@ export function ExpenseForm() {
         splitMode,
         expenseDate,
         splits: computeSplits(),
+        items: items.map((i) => ({
+          name: i.name,
+          amount: i.amount,
+          kind: i.kind || "item",
+          auto: i.auto === true,
+          splitAmong: i.splitAmong,
+        })),
         expenseId: isEdit ? expenseId || null : null,
       });
 
@@ -519,6 +542,15 @@ export function ExpenseForm() {
             {Math.abs(totalPaidBy - amountNum) < 0.01
               ? `Paid by ${Object.keys(payerAmounts).filter((id) => (parseFloat(payerAmounts[id]) || 0) > 0).length} people · ${symbol}${totalPaidBy.toLocaleString()}`
               : `Payers cover ${symbol}${totalPaidBy.toLocaleString()} of ${symbol}${amountNum.toLocaleString()} — tap "${paidByName}" to fix`}
+          </p>
+        )}
+        {splitMode === "itemized" && amountNum > 0 && (Math.abs(totalItemized - amountNum) >= 0.01 || unnamedItems > 0) && (
+          <p className="text-center text-[11px] mt-2 font-medium text-[var(--error)]">
+            {unnamedItems > 0
+              ? `${unnamedItems} item${unnamedItems > 1 ? "s" : ""} still need${unnamedItems > 1 ? "" : "s"} a name — tap "${splitLabel}" to fix`
+              : totalItemized - amountNum > 0
+                ? `Items add to ${symbol}${totalItemized.toLocaleString(undefined, { maximumFractionDigits: 2 })} — ${symbol}${(totalItemized - amountNum).toLocaleString(undefined, { maximumFractionDigits: 2 })} over ${symbol}${amountNum.toLocaleString(undefined, { maximumFractionDigits: 2 })} — tap "${splitLabel}" to fix`
+                : `Items add to ${symbol}${totalItemized.toLocaleString(undefined, { maximumFractionDigits: 2 })} of ${symbol}${amountNum.toLocaleString(undefined, { maximumFractionDigits: 2 })} — tap "${splitLabel}" to fix`}
           </p>
         )}
 

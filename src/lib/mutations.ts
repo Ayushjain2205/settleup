@@ -3,6 +3,14 @@ import { supabase } from "@/lib/supabase/browser";
 import { generateJoinCode } from "@/lib/join-code";
 import type { ExpenseWithSplits } from "@/lib/queries";
 
+export interface SaveExpenseItem {
+  name: string;
+  amount: string;
+  kind: string;
+  auto: boolean;
+  splitAmong: string[];
+}
+
 export interface SaveExpenseArgs {
   title: string;
   amount: number;
@@ -15,6 +23,8 @@ export interface SaveExpenseArgs {
   splitMode: string;
   expenseDate: string;
   splits: { memberId: string; amountOwed: number }[];
+  /** Itemized lines (entered currency). Only stored when splitMode is itemized. */
+  items?: SaveExpenseItem[];
   expenseId?: string | null;
 }
 
@@ -39,6 +49,7 @@ export function useSaveExpense(groupId: string) {
         p_splits: args.splits,
         p_expense_id: args.expenseId || null,
         p_payers: payers,
+        p_items: args.splitMode === "itemized" ? (args.items || []) : [],
       });
       if (error) throw error;
     },
