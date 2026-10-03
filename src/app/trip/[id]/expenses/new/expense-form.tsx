@@ -9,6 +9,7 @@ import { success, failure } from "@/lib/haptics";
 import { toast } from "@/components/toast";
 import { useSaveExpense } from "@/lib/mutations";
 import { computeSplitOwes } from "@/lib/splits";
+import { evaluateExpression, isExpression, parseAmount } from "@/lib/calc";
 import { compressImage, mapScanToLines, type ScanResult } from "@/lib/scan";
 import { PayerPicker } from "@/components/payer-picker";
 import { SplitOptions, type SplitItem } from "@/components/split-options";
@@ -183,9 +184,11 @@ export function ExpenseForm() {
     }
   }, [title]);
 
-  const amountNum = parseFloat(amount) || 0;
+  const amountNum = parseAmount(amount);
   const currency = useBaseCurrency ? group.baseCurrency : group.spendCurrency;
   const symbol = getSymbol(currency);
+  // Live preview while typing arithmetic ("850+120" → "= 970")
+  const amountPreview = isExpression(amount) ? evaluateExpression(amount) : null;
   // Convert entered amount to base currency
   const toBase = (v: number) => (useBaseCurrency ? v : v * group.fxRate);
   const baseAmount = toBase(amountNum);
@@ -195,7 +198,7 @@ export function ExpenseForm() {
 
   const paidByName = (() => {
     if (!isMultiPayer) return members.find((m) => m.id === paidBy)?.name || "you";
-    const ids = Object.keys(payerAmounts).filter((id) => (parseFloat(payerAmounts[id]) || 0) > 0);
+    const ids = Object.keys(payerAmounts).filter((id) => parseAmount(payerAmounts[id]) > 0);
     if (ids.length === 0) return "Multiple people";
     if (ids.length === 1) return members.find((m) => m.id === ids[0])?.name || "1 person";
     const first = members.find((m) => m.id === ids[0])?.name || "Someone";
@@ -208,9 +211,9 @@ export function ExpenseForm() {
   const totalPercent = Object.values(percentages).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   const totalItemized = items.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
   const unnamedItems = items.filter((i) => i.name.trim().length === 0).length;
-  const totalPaidBy = Object.values(payerAmounts).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+  const totalPaidBy = Object.values(payerAmounts).reduce((sum, v) => sum + parseAmount(v), 0);
   const payersValid = isMultiPayer
-    ? Object.keys(payerAmounts).filter((id) => (parseFloat(payerAmounts[id]) || 0) > 0).length > 0 &&
+    ? Object.keys(payerAmounts).filter((id) => parseAmount(payerAmounts[id]) > 0).length > 0 &&
       Math.abs(totalPaidBy - amountNum) < 0.01
     : paidBy !== "";
 
@@ -255,7 +258,7 @@ export function ExpenseForm() {
       }
 
       const payerIds = isMultiPayer
-        ? Object.keys(payerAmounts).filter((id) => (parseFloat(payerAmounts[id]) || 0) > 0)
+        ? Object.keys(payerAmounts).filter((id) => parseAmount(payerAmounts[id]) > 0)
         : [paidBy];
       const firstPayer = payerIds[0] || paidBy;
       await saveExpense.mutateAsync({
@@ -512,12 +515,24 @@ export function ExpenseForm() {
             <span className="text-lg font-semibold text-[var(--muted)]">{symbol}</span>
           </button>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="0"
-            className="flex-1 text-xl font-bold text-[var(--foreground)] bg-transparent border-0 border-b-2 border-[var(--primary)] focus:outline-none pb-2 placeholder:text-[var(--border-color)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            onBlur={() => {
+              // Collapse "850+120" into its result when leaving the field
+              const v = evaluateExpression(amount);
+              if (v !== null && String(v) !== amount.trim()) setAmount(String(v));
+            }}
+            placeholder="0 — or 850+120"
+            className="flex-1 min-w-0 text-xl font-bold text-[var(--foreground)] bg-transparent border-0 border-b-2 border-[var(--primary)] focus:outline-none pb-2 placeholder:text-[var(--border-color)] placeholder:text-sm placeholder:font-medium"
           />
+          {amountPreview !== null && (
+            <span className="text-sm font-bold text-[var(--primary)] tabular-nums whitespace-nowrap flex-shrink-0">
+              = {symbol}{amountPreview.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            </span>
+          )}
         </div>
 
         {/* Paid by + Split */}
@@ -540,7 +555,7 @@ export function ExpenseForm() {
         {isMultiPayer && amountNum > 0 && (
           <p className={`text-center text-[11px] mt-2 font-medium ${Math.abs(totalPaidBy - amountNum) < 0.01 ? "text-[var(--success)]" : "text-[var(--error)]"}`}>
             {Math.abs(totalPaidBy - amountNum) < 0.01
-              ? `Paid by ${Object.keys(payerAmounts).filter((id) => (parseFloat(payerAmounts[id]) || 0) > 0).length} people · ${symbol}${totalPaidBy.toLocaleString()}`
+              ? `Paid by ${Object.keys(payerAmounts).filter((id) => parseAmount(payerAmounts[id]) > 0).length} people · ${symbol}${totalPaidBy.toLocaleString()}`
               : `Payers cover ${symbol}${totalPaidBy.toLocaleString()} of ${symbol}${amountNum.toLocaleString()} — tap "${paidByName}" to fix`}
           </p>
         )}
