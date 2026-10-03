@@ -82,7 +82,7 @@ export function ExpenseForm() {
   const [hydratedId, setHydratedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
-  const [amountFocused, setAmountFocused] = useState(false);
+  const [showOps, setShowOps] = useState(false);
   const scanTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastScan = useRef<Blob | null>(null);
   const saveExpense = useSaveExpense(group.id);
@@ -550,9 +550,7 @@ export function ExpenseForm() {
             autoComplete="off"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            onFocus={() => setAmountFocused(true)}
             onBlur={() => {
-              setAmountFocused(false);
               // Collapse "850+120" into its result when leaving the field
               const v = evaluateExpression(amount);
               if (v !== null && String(v) !== amount.trim()) setAmount(String(v));
@@ -565,10 +563,23 @@ export function ExpenseForm() {
               = {symbol}{amountPreview.toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </span>
           )}
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setShowOps((v) => !v)}
+            aria-label="Calculator"
+            title="Calculator"
+            className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+              showOps ? "bg-[var(--primary)] text-white" : "text-[var(--muted)] active:bg-[var(--background)]"
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m-3 4v4m-4-8h.01M16 11h.01M16 15h.01M12 15h.01M8 15h.01M8 11h.01M6 3h12a1 1 0 011 1v16a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z" />
+            </svg>
+          </button>
         </div>
 
         {/* Operator pad — numeric keyboards have no +−×÷, so provide them */}
-        {amountFocused && (
+        {showOps && (
           <div className="flex gap-1.5 -mt-3 mb-4">
             {(["+", "−", "×", "÷", "(", ")"] as const).map((op) => (
               <button
