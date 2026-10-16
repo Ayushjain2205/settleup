@@ -36,11 +36,28 @@ describe("computeSplitOwes", () => {
       adjustments: [],
       toBase: identity,
     });
+    // Largest-remainder: leftover penny goes to the first member so the
+    // parts sum exactly to the total (no phantom 0.01).
     expect(result).toEqual([
-      { memberId: "a", amountOwed: 33.33 },
+      { memberId: "a", amountOwed: 33.34 },
       { memberId: "b", amountOwed: 33.33 },
       { memberId: "c", amountOwed: 33.33 },
     ]);
+    expect(result.reduce((s, r) => s + r.amountOwed, 0)).toBeCloseTo(100, 2);
+  });
+
+  it("sums exactly to 1300 split 3 ways (the Shoffr dust case)", () => {
+    const result = computeSplitOwes({
+      mode: "equal",
+      baseAmount: 1300,
+      selected: ["a", "b", "c"],
+      exactAmounts: {},
+      percentages: {},
+      items: [],
+      adjustments: [],
+      toBase: identity,
+    });
+    expect(result.reduce((s, r) => s + r.amountOwed, 0)).toBeCloseTo(1300, 2);
   });
 
   it("uses exact amounts converted to base", () => {
@@ -213,5 +230,54 @@ describe("computeSplitOwes", () => {
       toBase: identity,
     });
     expect(result).toEqual([{ memberId: "a", amountOwed: 115 }]);
+  });
+
+  it("zero-sum property: equal splits always total exactly (2..10 members)", () => {
+    for (let n = 2; n <= 10; n++) {
+      const ids = Array.from({ length: n }, (_, i) => `m${i}`);
+      for (const total of [0.01, 0.03, 1, 10, 100, 1300, 9999.99, 12345.67]) {
+        const result = computeSplitOwes({
+          mode: "equal",
+          baseAmount: total,
+          selected: ids,
+          exactAmounts: {},
+          percentages: {},
+          items: [],
+          adjustments: [],
+          toBase: identity,
+        });
+        const sum = Math.round(result.reduce((s, r) => s + r.amountOwed, 0) * 100);
+        expect(sum).toBe(Math.round(Math.round(total * 100)));
+      }
+    }
+  });
+
+  it("zero-sum property: percent splits total exactly when pcts sum to 100", () => {
+    const result = computeSplitOwes({
+      mode: "percent",
+      baseAmount: 1000,
+      selected: [],
+      exactAmounts: {},
+      percentages: { a: "33.33", b: "33.33", c: "33.34" },
+      items: [],
+      adjustments: [],
+      toBase: identity,
+    });
+    expect(Math.round(result.reduce((s, r) => s + r.amountOwed, 0) * 100)).toBe(100000);
+  });
+
+  it("leaves genuine partial splits alone (does not inflate to total)", () => {
+    // 60 + 40 = 100 of a 200 total is a real partial, not dust.
+    const result = computeSplitOwes({
+      mode: "exact",
+      baseAmount: 200,
+      selected: [],
+      exactAmounts: { a: "60", b: "40" },
+      percentages: {},
+      items: [],
+      adjustments: [],
+      toBase: identity,
+    });
+    expect(result.reduce((s, r) => s + r.amountOwed, 0)).toBeCloseTo(100, 2);
   });
 });

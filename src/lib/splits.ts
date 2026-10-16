@@ -35,6 +35,43 @@ interface ComputeSplitsArgs {
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
+/** Largest-remainder penny fix: nudge rounded cents so the parts sum
+ *  exactly to the target. `raws` are the unrounded values (same order as
+ *  `out`) used to rank who gets the leftover pennies fairly. Without this,
+ *  e.g. 1300 split 3 ways rounds to 433.33 x3 = 1299.99 and leaves a phantom
+ *  0.01 credit that never settles. */
+export function reconcileCents(
+  out: SplitOwed[],
+  raws: number[],
+  targetCents: number
+): SplitOwed[] {
+  if (out.length === 0) return out;
+  const sumCents = out.reduce((s, r) => s + Math.round(r.amountOwed * 100), 0);
+  let diff = Math.round(targetCents) - sumCents;
+  if (diff === 0) return out;
+  // Only fix rounding dust (at most a penny per part). Larger gaps are
+  // genuine under/over splits — leave them alone.
+  if (Math.abs(diff) > out.length) return out;
+  const frac = raws.map((r) => {
+    const cents = r * 100;
+    return cents - Math.floor(cents + 1e-9);
+  });
+  const order = out.map((_, i) => i).sort((a, b) =>
+    diff > 0 ? frac[b] - frac[a] || a - b : frac[a] - frac[b] || a - b
+  );
+  const fixed = out.map((r) => ({ ...r }));
+  let k = 0;
+  while (diff !== 0) {
+    const i = order[k % order.length];
+    fixed[i] = { ...fixed[i], amountOwed: round2(fixed[i].amountOwed + (diff > 0 ? 0.01 : -0.01)) };
+    diff += diff > 0 ? -1 : 1;
+    k++;
+    // Safety: never loop forever on pathological input.
+    if (k > out.length * 10) break;
+  }
+  return fixed;
+}
+
 /** Per-member owed amounts in base currency. Itemized collapses items
  *  into member totals; auto adjustments ride proportionally on top. */
 export function computeSplitOwes({
@@ -48,18 +85,26 @@ export function computeSplitOwes({
   toBase,
 }: ComputeSplitsArgs): SplitOwed[] {
   if (mode === "equal") {
-    const share = baseAmount / selected.length;
-    return selected.map((id) => ({ memberId: id, amountOwed: round2(share) }));
+    if (selected.length === 0) return [];
+    const targetCents = Math.round(round2(baseAmount) * 100);
+    const floorCents = Math.floor(targetCents / selected.length);
+    const remainder = targetCents - floorCents * selected.length;
+    return selected.map((id, i) => ({
+      memberId: id,
+      amountOwed: (floorCents + (i < remainder ? 1 : 0)) / 100,
+    }));
   }
   if (mode === "exact") {
-    return Object.entries(exactAmounts)
-      .filter(([, v]) => (parseFloat(v) || 0) > 0)
-      .map(([id, v]) => ({ memberId: id, amountOwed: round2(toBase(parseFloat(v))) }));
+    const entries = Object.entries(exactAmounts).filter(([, v]) => (parseFloat(v) || 0) > 0);
+    const raws = entries.map(([, v]) => toBase(parseFloat(v)));
+    const out = entries.map(([id], i) => ({ memberId: id, amountOwed: round2(raws[i]) }));
+    return reconcileCents(out, raws, Math.round(round2(baseAmount) * 100));
   }
   if (mode === "percent") {
-    return Object.entries(percentages)
-      .filter(([, v]) => (parseFloat(v) || 0) > 0)
-      .map(([id, v]) => ({ memberId: id, amountOwed: round2(baseAmount * (parseFloat(v) / 100)) }));
+    const entries = Object.entries(percentages).filter(([, v]) => (parseFloat(v) || 0) > 0);
+    const raws = entries.map(([, v]) => baseAmount * (parseFloat(v) / 100));
+    const out = entries.map(([id], i) => ({ memberId: id, amountOwed: round2(raws[i]) }));
+    return reconcileCents(out, raws, Math.round(round2(baseAmount) * 100));
   }
   const totals = new Map<string, number>();
   for (const item of items) {
@@ -97,8 +142,10 @@ export function computeSplitOwes({
     const share = adjBase / everyone.length;
     for (const id of everyone) addShare(id, share);
   }
-  return [...totals.entries()].map(([memberId, amountOwed]) => ({
+  const rawsByMember = [...totals.entries()].map(([, v]) => v);
+  const out = [...totals.entries()].map(([memberId, amountOwed], i) => ({
     memberId,
-    amountOwed: round2(amountOwed),
+    amountOwed: round2(rawsByMember[i]),
   }));
+  return reconcileCents(out, rawsByMember, Math.round(round2(baseAmount) * 100));
 }

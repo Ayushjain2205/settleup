@@ -8,7 +8,7 @@ import { errorMessage } from "@/lib/error";
 import { success, failure } from "@/lib/haptics";
 import { toast } from "@/components/toast";
 import { useSaveExpense } from "@/lib/mutations";
-import { computeSplitOwes } from "@/lib/splits";
+import { computeSplitOwes, reconcileCents } from "@/lib/splits";
 import { evaluateExpression, isExpression, parseAmount } from "@/lib/calc";
 import { compressImage, mapScanToLines, type ScanResult } from "@/lib/scan";
 import { PayerPicker } from "@/components/payer-picker";
@@ -263,6 +263,14 @@ export function ExpenseForm() {
         ? Object.keys(payerAmounts).filter((id) => parseAmount(payerAmounts[id]) > 0)
         : [paidBy];
       const firstPayer = payerIds[0] || paidBy;
+      // Multi-payer legs are converted to base individually — FX rounding
+      // can leave the legs a penny off the total (same dust as splits).
+      const rawPayers = payerIds.map((id) => toBase(parseFloat(isMultiPayer ? payerAmounts[id] : String(amountNum)) || 0));
+      const roundedPayers = payerIds.map((id, i) => ({
+        memberId: id,
+        amountOwed: Math.round(rawPayers[i] * 100) / 100,
+      }));
+      const fixedPayers = reconcileCents(roundedPayers, rawPayers, Math.round(Math.round(baseAmount * 100)));
       await saveExpense.mutateAsync({
         title: title.trim(),
         amount: amountNum,
@@ -270,9 +278,9 @@ export function ExpenseForm() {
         baseAmount,
         categoryId: category?.id || "other",
         paidBy: firstPayer,
-        payers: payerIds.map((id) => ({
-          memberId: id,
-          amountPaid: toBase(parseFloat(isMultiPayer ? payerAmounts[id] : String(amountNum)) || 0),
+        payers: fixedPayers.map((p) => ({
+          memberId: p.memberId,
+          amountPaid: p.amountOwed,
         })),
         splitMode,
         expenseDate,
